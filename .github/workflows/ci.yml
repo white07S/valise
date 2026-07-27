@@ -8,7 +8,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
+  # A RUSTFLAGS env var REPLACES `target.*.rustflags` from .cargo/config.toml
+  # rather than merging with it, so the x86-64-v3 baseline has to be repeated
+  # here or the Linux jobs would silently stop exercising the static AVX2
+  # dispatch path. Keep these two in sync with .cargo/config.toml.
+  RUSTFLAGS: -C target-cpu=x86-64-v3 -D warnings
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -61,6 +65,11 @@ jobs:
     if: github.event_name == 'push'
     runs-on: macos-14
     timeout-minutes: 30
+    # NEON is baseline on Apple silicon, so no target-cpu override is needed
+    # here — but the job-level value still has to be set, because the
+    # workflow-level x86-64-v3 flag would not apply to an aarch64 target.
+    env:
+      RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

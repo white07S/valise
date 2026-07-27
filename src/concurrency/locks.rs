@@ -61,9 +61,15 @@ pub(crate) fn release_byte_lock(fd: BorrowedFd<'_>, byte: u64) -> Result<()> {
 
 #[cfg(unix)]
 fn fcntl_setlk(fd: BorrowedFd<'_>, byte: u64, kind: LockKind, nonblocking: bool) -> Result<bool> {
+    // The `as i16` casts are load-bearing on Linux, where the F_*LCK
+    // constants are `i32` while `flock.l_type` is `i16`. On macOS they are
+    // already `i16` and clippy will call the cast redundant — do not remove
+    // it on that advice, and do not run `clippy --fix` for this file on a
+    // Mac without re-checking Linux.
+    #[allow(clippy::unnecessary_cast)]
     let l_type = match kind {
-        LockKind::Shared => libc::F_RDLCK,
-        LockKind::Exclusive => libc::F_WRLCK,
+        LockKind::Shared => libc::F_RDLCK as i16,
+        LockKind::Exclusive => libc::F_WRLCK as i16,
     };
     let mut fl: libc::flock = unsafe { std::mem::zeroed() };
     fl.l_type = l_type;
@@ -90,7 +96,11 @@ fn fcntl_setlk(fd: BorrowedFd<'_>, byte: u64, kind: LockKind, nonblocking: bool)
 #[cfg(unix)]
 fn fcntl_unlk(fd: BorrowedFd<'_>, byte: u64) -> Result<bool> {
     let mut fl: libc::flock = unsafe { std::mem::zeroed() };
-    fl.l_type = libc::F_UNLCK;
+    // See `fcntl_setlk`: this cast is required on Linux, redundant on macOS.
+    #[allow(clippy::unnecessary_cast)]
+    {
+        fl.l_type = libc::F_UNLCK as i16;
+    }
     fl.l_whence = libc::SEEK_SET as i16;
     fl.l_start = byte as libc::off_t;
     fl.l_len = 1 as libc::off_t;

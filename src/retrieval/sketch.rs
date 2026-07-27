@@ -135,6 +135,10 @@ pub(crate) fn scan_candidates(
             };
         }
     }
+    // Dead by construction when avx2+popcnt are static (the x86-64-v3
+    // baseline in .cargo/config.toml): the first arm above returns. That is
+    // the point of the cfg ladder, not an oversight.
+    #[allow(unreachable_code)]
     scan_candidates_scalar(sketches, words, rows, q_sketch, ck, dim, parallel, hbuf)
 }
 

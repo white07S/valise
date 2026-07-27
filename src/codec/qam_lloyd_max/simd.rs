@@ -1211,7 +1211,6 @@ mod tests {
             return;
         }
         let dim = 1024;
-        let block_size = 1024;
         let mut data = random_unit_vector(dim, 0x09_BB_00);
         let n_before: f32 = data.iter().map(|v| v * v).sum();
         let signs = deterministic_signs(dim, 0x0A_BB_00);

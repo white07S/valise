@@ -1,5 +1,5 @@
 # Per-target SIMD baselines for the QAM hot kernels
-# (docs/X86_64_SIMD_PLAN.md §6).
+# (see docs/VECTOR_SEARCH.md for the kernel design).
 #
 # The arch-specific kernels in src/codec/qam_lloyd_max/simd/ and
 # src/retrieval/sketch/ have two dispatch paths:
