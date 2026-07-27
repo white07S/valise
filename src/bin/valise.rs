@@ -31,6 +31,9 @@ enum Command {
     Info {
         /// Path to the `.vls` file.
         file: PathBuf,
+        /// Break the file size down by segment type — where the bytes went.
+        #[arg(long)]
+        segments: bool,
         /// Emit JSON instead of a human-readable table.
         #[arg(long)]
         json: bool,
@@ -88,7 +91,11 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Info { file, json } => info(&file, json),
+        Command::Info {
+            file,
+            segments,
+            json,
+        } => info(&file, segments, json),
         Command::Search {
             file,
             collection,
@@ -116,11 +123,14 @@ fn open_existing(path: &PathBuf) -> Result<Store> {
     Store::open(path)
 }
 
-fn info(path: &PathBuf, json: bool) -> Result<()> {
+fn info(path: &PathBuf, segments: bool, json: bool) -> Result<()> {
     let store = open_existing(path)?;
     let stats = store.stats();
     let collections = store.collections();
     let spaces = store.spaces();
+    // Live bytes only — tombstoned segments are excluded, so after deletes
+    // this sums to less than the file on disk until `compact` reclaims it.
+    let breakdown = store.raw().reader().storage_breakdown();
 
     if json {
         let payload = serde_json::json!({
@@ -134,6 +144,9 @@ fn info(path: &PathBuf, json: bool) -> Result<()> {
             "collections": collections.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
             "spaces": spaces.iter().map(|s| {
                 serde_json::json!({ "name": s.name, "kind": format!("{:?}", s.kind), "auto": s.auto })
+            }).collect::<Vec<_>>(),
+            "segments": breakdown.iter().map(|(t, count, bytes)| {
+                serde_json::json!({ "type": format!("{t:?}"), "count": count, "bytes": bytes })
             }).collect::<Vec<_>>(),
         });
         println!("{}", json_pretty(&payload)?);
@@ -173,6 +186,49 @@ fn info(path: &PathBuf, json: bool) -> Result<()> {
         for s in &spaces {
             let auto = if s.auto { "  [auto]" } else { "" };
             println!("    - {} ({:?}){auto}", s.name, s.kind);
+        }
+    }
+
+    if segments {
+        let live: u64 = breakdown.iter().map(|(_, _, b)| b).sum();
+        println!("\n  where the bytes are (live segments only):");
+        println!(
+            "    {:<22} {:>6}  {:>12}  {:>7}",
+            "segment", "count", "bytes", "share"
+        );
+        for (kind, count, bytes) in &breakdown {
+            let pct = if live == 0 {
+                0.0
+            } else {
+                *bytes as f64 * 100.0 / live as f64
+            };
+            println!(
+                "    {:<22} {count:>6}  {:>12}  {pct:>6.1}%",
+                format!("{kind:?}"),
+                human_bytes(*bytes)
+            );
+        }
+        println!(
+            "    {:<22} {:>6}  {:>12}",
+            "TOTAL (live)",
+            "",
+            human_bytes(live)
+        );
+        // The gap is tombstoned segments plus the header and TOC footer.
+        let overhead = stats.file_bytes.saturating_sub(live);
+        println!(
+            "    {:<22} {:>6}  {:>12}   header, footer, and any reclaimable gap",
+            "file on disk",
+            "",
+            human_bytes(stats.file_bytes)
+        );
+        if overhead > 0 {
+            println!(
+                "    {:<22} {:>6}  {:>12}",
+                "  of which not live",
+                "",
+                human_bytes(overhead)
+            );
         }
     }
     Ok(())

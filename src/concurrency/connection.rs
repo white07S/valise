@@ -186,6 +186,19 @@ impl ReadConnection {
         self.snapshot.read_raw_text(frame_id)
     }
 
+    /// Live bytes on disk per segment type: `(type, segment count, bytes)`,
+    /// sorted by the type's wire discriminant.
+    ///
+    /// This is the "where did my file size go" accounting — payloads versus
+    /// the term dictionary versus postings versus vector codes. Tombstoned
+    /// segments are excluded, so after deletes the total is smaller than the
+    /// file on disk until [`crate::db::Store::compact`] reclaims the gap.
+    ///
+    /// Cheap: one pass over the in-memory segment registry.
+    pub fn storage_breakdown(&self) -> Vec<(crate::format::segment::SegmentType, u32, u64)> {
+        self.db.inner.read().storage_breakdown_by_segment_type()
+    }
+
     // ---- search and index reads: NOT pinned ----
     //
     // These take the read lock and observe the latest committed state.

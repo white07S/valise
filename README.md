@@ -162,6 +162,9 @@ Statistically indistinguishable. A formula matches a learned codebook — which
 means no training pass, no codebook to ship alongside your data, and no
 data-dependent artifact baked into your file.
 
+[ANATOMY.md](docs/ANATOMY.md) shows where every byte of a real 100,000-record
+capsule goes, and how the total compares against the same corpus in SQLite.
+
 And then the part no other quantizer in that table does: **the codes are also
 the index.** Everyone else pays for compression *and* a separate search
 structure. Valise derives its candidate sketch from the same bytes it already
@@ -459,6 +462,7 @@ does not list. Call `refresh_snapshot()` when the two must agree.
 |---|---|
 | [Python docs](https://white07S.github.io/valise) | Quickstart, concepts, full API reference |
 | [docs.rs](https://docs.rs/valise) | Rust API |
+| [docs/ANATOMY.md](docs/ANATOMY.md) | Where the bytes go — a real 100k-record capsule, segment by segment, vs SQLite |
 | [docs/FORMAT.md](docs/FORMAT.md) | On-disk format, commit and recovery protocol |
 | [docs/VECTOR_SEARCH.md](docs/VECTOR_SEARCH.md) | Sketch design, recall/latency envelope, failed experiments |
 | [docs/CONCURRENCY.md](docs/CONCURRENCY.md) | Reader/writer model and decision log |

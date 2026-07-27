@@ -37,6 +37,10 @@ files:
 - [`tests/golden_format_v2.rs`](../tests/golden_format_v2.rs) — deterministic
   fixture hash that catches accidental byte-layout drift.
 
+For a concrete byte-level walkthrough — a real 100,000-record capsule broken
+down segment by segment, and compared against the same corpus in SQLite — see
+[ANATOMY.md](ANATOMY.md).
+
 If code and this page disagree, treat the code and golden tests as the active
 contract, then update this page in the same change.
 
