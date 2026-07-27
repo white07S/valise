@@ -144,6 +144,13 @@ jobs:
     environment: pypi
     permissions:
       id-token: write # required for Trusted Publishing
+    # This job never checks out the repo — it only consumes artifacts — so
+    # the workflow-level `bindings/valise-py` working directory does not
+    # exist here and has to be overridden, or every `run` step fails before
+    # it starts.
+    defaults:
+      run:
+        working-directory: .
     steps:
       - uses: actions/download-artifact@v4
         with:
