@@ -784,6 +784,10 @@ fn codec_choice_reaches_engine_catalog() {
             ),
         )
         .unwrap();
+    // `Calibrate::now` fits the codec at declaration time, but a
+    // `ReadConnection` is served from a pinned snapshot and so only sees
+    // committed state — reading before this commit would be a dirty read.
+    store.writer().commit().unwrap();
     let families: Vec<CodecFamily> = store
         .raw()
         .reader()

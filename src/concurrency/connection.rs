@@ -13,7 +13,7 @@
 //!   connection so the borrow checker enforces single-writer semantics
 //!   end-to-end.
 //!
-//! See `docs/CONCURRENCY_PLAN.md` §6.
+//! See `docs/CONCURRENCY.md`.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -42,10 +42,21 @@ use crate::retrieval::Hit;
 /// concurrent commits — a long-running query sees the bytes in place at
 /// acquisition even if the writer rotates the current mmap underneath.
 ///
-/// Most read methods on `ReadConnection` defer to the inner `ValiseFile`
-/// via the `Database`'s read-side `RwLock`. Methods that benefit from
-/// the snapshot pin (multi-step queries, streaming) can call
-/// [`Self::snapshot`] and use the snapshot directly.
+/// # What the pin does and does not cover
+///
+/// Catalog reads (`collections`, `frame_stubs`, `vectors`, the profile and
+/// schema tables) and payload reads (`frame_full`, `read_payload`,
+/// `read_raw_text`) are served from the pinned `Snapshot` and are stable
+/// for the connection's lifetime.
+///
+/// The **search methods are not pinned**: `query_text`, `query_hybrid`,
+/// `vector_search`, `time_range_query`, `read_vector`, and the
+/// `collection_member_*` accessors take the `Database`'s read lock and see
+/// the latest committed state. `Snapshot` pins the mmap and the catalog,
+/// but the lexical and vector indexes live in the `ValiseFile` and are not
+/// snapshotted, so a query issued after a concurrent commit can return a
+/// frame that this connection's own `frame_stubs()` does not list. Call
+/// [`Self::refresh_snapshot`] to re-pin if you need the two to agree.
 pub struct ReadConnection {
     db: Arc<Database>,
     snapshot: Arc<Snapshot>,
@@ -77,31 +88,44 @@ impl ReadConnection {
         &self.db
     }
 
-    // ---- delegated read methods ----
+    // ---- catalog reads: served from the pinned snapshot ----
     //
-    // Each delegates to the underlying `ValiseFile` via the read-side
-    // `RwLock`. Stage 5 will rewire these to drive off
-    // `self.snapshot` directly, eliminating the per-call lock. For
-    // Stage 4 the lock is brief and uncontended on the read path.
+    // These drive off `self.snapshot.catalog()`, which is the
+    // `CatalogSnapshot` captured when this connection pinned. Reading them
+    // through `db.inner` instead would return whatever a concurrent writer
+    // has since committed, so a connection could observe its own frame
+    // count change underneath it — the pin would be decorative.
+    //
+    // They take no lock, which is also why they are cheaper than the
+    // query methods below.
 
     pub fn path(&self) -> PathBuf {
         self.db.inner.read().path().to_path_buf()
     }
 
+    /// The live file header, **not** a pinned value. `Snapshot` captures
+    /// `generation` and `toc_offset` but not the whole `Header`; use
+    /// [`Snapshot::generation`] when you need the pinned identity.
     pub fn header(&self) -> Header {
         self.db.inner.read().header().clone()
     }
 
     pub fn collections(&self) -> Vec<CollectionDesc> {
-        self.db.inner.read().collections().to_vec()
+        self.snapshot.catalog().collections.clone()
     }
 
+    /// Heavy per-frame catalog as of the pin.
+    ///
+    /// Note this is the *decoded* `frames` vector, which the open
+    /// fast-path deliberately leaves empty — see [`Self::frame_stubs`] for
+    /// the always-populated `(frame_id, status)` view, and
+    /// [`Self::frame_full`] to resolve one frame on demand.
     pub fn frames(&self) -> Vec<FrameDesc> {
-        self.db.inner.read().frames().to_vec()
+        self.snapshot.catalog().frames.clone()
     }
 
     pub fn frame_stubs(&self) -> Vec<FrameStub> {
-        self.db.inner.read().frame_stubs().to_vec()
+        self.snapshot.catalog().frame_stubs.clone()
     }
 
     /// Resolve a frame to its full `FrameDesc` via the pinned snapshot.
@@ -113,35 +137,35 @@ impl ReadConnection {
     }
 
     pub fn vectors(&self) -> Vec<VectorDesc> {
-        self.db.inner.read().vectors().to_vec()
+        self.snapshot.catalog().vectors.clone()
     }
 
     pub fn embedding_spaces(&self) -> Vec<EmbeddingSpaceDesc> {
-        self.db.inner.read().embedding_spaces().to_vec()
+        self.snapshot.catalog().embedding_spaces.clone()
     }
 
     pub fn codecs(&self) -> Vec<CodecDesc> {
-        self.db.inner.read().codecs().to_vec()
+        self.snapshot.catalog().codecs.clone()
     }
 
     pub fn text_spaces(&self) -> Vec<TextSpaceDesc> {
-        self.db.inner.read().text_spaces().to_vec()
+        self.snapshot.catalog().text_spaces.clone()
     }
 
     pub fn analyzers(&self) -> Vec<AnalyzerDesc> {
-        self.db.inner.read().analyzers().to_vec()
+        self.snapshot.catalog().analyzers.clone()
     }
 
     pub fn field_schemas(&self) -> Vec<FieldSchemaDesc> {
-        self.db.inner.read().field_schemas().to_vec()
+        self.snapshot.catalog().field_schemas.clone()
     }
 
     pub fn retrieval_profiles(&self) -> Vec<RetrievalProfileDesc> {
-        self.db.inner.read().retrieval_profiles().to_vec()
+        self.snapshot.catalog().retrieval_profiles.clone()
     }
 
     pub fn fusion_profiles(&self) -> Vec<FusionProfileDesc> {
-        self.db.inner.read().fusion_profiles().to_vec()
+        self.snapshot.catalog().fusion_profiles.clone()
     }
 
     /// Read a frame's payload bytes via the pinned snapshot. Lock-free
@@ -155,6 +179,13 @@ impl ReadConnection {
     pub fn read_raw_text(&self, frame_id: FrameId) -> Result<String> {
         self.snapshot.read_raw_text(frame_id)
     }
+
+    // ---- search and index reads: NOT pinned ----
+    //
+    // These take the read lock and observe the latest committed state.
+    // The indexes they consult live in the `ValiseFile`, not in
+    // `Snapshot`, so pinning them would mean snapshotting index state
+    // too. See the type-level docs.
 
     pub fn read_vector(
         &self,
