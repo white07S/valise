@@ -2,7 +2,7 @@
 //! rerank, plus the open-time vector base-pointer / sketch / norm caches
 //! the hot path reads.
 //!
-//! Layered as: [`ValiseFile::vector_search`] resolves the space + codec and
+//! Layered as: [`ValiseFile::vector_search`](crate::ValiseFile::vector_search) resolves the space + codec and
 //! dispatches — UPQ spaces route to `upq_search.rs`, QAM spaces to
 //! `sketch_then_rerank_impl` (the (5,6) config additionally engages the
 //! integer SDOT sliding kernel), anything without a sketch index falls

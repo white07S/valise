@@ -290,7 +290,7 @@ impl Store {
     /// (canonical ordered comparison against the persisted schema) and
     /// accepted when purely additive (new fields appended, prior fields
     /// unchanged — the persisted doc is rewritten); anything else is
-    /// [`Error::SchemaMismatch`] with field-level detail.
+    /// `Error::SchemaMismatch` with field-level detail.
     ///
     /// Durability is **stage-only**: the persisted schema rides the next
     /// commit, exactly like the collection creation itself. A declare with

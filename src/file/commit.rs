@@ -11,7 +11,7 @@ impl ValiseFile {
     /// the flushed bytes are orphan appends past the current
     /// `footer_offset` until a `commit()` publishes a new footer that
     /// references them; a reopen before that commit ignores them. To
-    /// produce a new snapshot (commit a TOC update), call [`commit`].
+    /// produce a new snapshot (commit a TOC update), call `commit`.
     ///
     /// `commit()` issues its own trailing fsync (the avalanche barrier),
     /// so callers that always commit between batches do not need to
@@ -36,7 +36,7 @@ impl ValiseFile {
     }
 
     /// Commit + return a per-phase wall-clock breakdown. Same effects as
-    /// [`commit`]; the second tuple element captures where time was spent.
+    /// `commit`; the second tuple element captures where time was spent.
     /// Useful when you need to understand commit-time costs without
     /// instrumenting the library or shelling out to a profiler.
     pub fn commit_with_profile(&mut self) -> Result<(CommitOutcome, CommitProfile)> {

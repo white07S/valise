@@ -136,11 +136,11 @@ impl IngestProfile {
 /// `src/file/text_indexing.rs::build_flush_output`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TextIndexBuildProfile {
-    /// Step 1: BTreeMap<Vec<u8>, ()> of newly-introduced term bytes.
+    /// Step 1: `BTreeMap<Vec<u8>, ()>` of newly-introduced term bytes.
     pub collect_new_terms: std::time::Duration,
     /// Step 2: assign monotonic term ids.
     pub assign_term_ids: std::time::Duration,
-    /// Step 3: per-term posting list deltas (BTreeMap<TermId, Vec<Posting>>).
+    /// Step 3: per-term posting list deltas (`BTreeMap<TermId, Vec<Posting>>`).
     pub build_postings: std::time::Duration,
     /// Step 4: per-term-dict-record df/cf aggregation.
     pub build_term_dict: std::time::Duration,
@@ -150,7 +150,7 @@ pub struct TextIndexBuildProfile {
     pub encode_segments: std::time::Duration,
 }
 
-/// Per-phase wall-clock breakdown emitted by [`ValiseFile::commit_with_profile`].
+/// Per-phase wall-clock breakdown emitted by [`ValiseFile::commit_with_profile`](crate::ValiseFile::commit_with_profile).
 ///
 /// Captured live (not via env vars or logging) so the bench harness — and
 /// any other caller that wants to understand commit-time costs — can print

@@ -76,6 +76,27 @@ todo = "warn"
 unimplemented = "warn"
 uninlined_format_args = "warn"
 
+# Deliberate exceptions. CI runs clippy with `-D warnings`, so anything not
+# listed here has to be fixed rather than tolerated — keep this list short
+# and justified.
+#
+# The format and catalog layers return rich tuples (stubs + locators +
+# decoded frames) that are consumed once at a single call site. Naming each
+# shape would add indirection a reader then has to chase.
+type_complexity = "allow"
+# The SIMD kernels take explicit slice/stride/budget arguments instead of a
+# params struct so the values stay in registers across the inner loop.
+too_many_arguments = "allow"
+# Boxing the large variant would put an allocation on the commit path,
+# which is exactly where it must not be.
+large_enum_variant = "allow"
+# Index loops in the numeric kernels are written to mirror the arithmetic
+# they implement; iterator rewrites obscure the stride relationships.
+needless_range_loop = "allow"
+# `Codec::to_params` returns a borrowed view rather than consuming a Copy
+# receiver; taking self by value would force callers to re-copy.
+wrong_self_convention = "allow"
+
 [workspace]
 members = ["bench", "bindings/valise-py"]
 

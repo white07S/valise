@@ -215,18 +215,18 @@ pub struct Hit {
 /// The hits of one search, best-first. Derefs to `[Hit]` and iterates (owned
 /// or by reference), so it can be used wherever a slice/`Vec` of hits was.
 ///
-/// The private extension slot keeps construction crate-internal so
-/// result-level metadata (timings, counters, …) can be added later without a
-/// breaking change.
+/// `#[non_exhaustive]` keeps construction crate-internal so result-level
+/// metadata (timings, counters, …) can be added later without a breaking
+/// change.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct SearchResult {
     pub hits: Vec<Hit>,
-    _ext: (),
 }
 
 impl SearchResult {
     pub(crate) fn new(hits: Vec<Hit>) -> Self {
-        Self { hits, _ext: () }
+        Self { hits }
     }
 
     /// Consume the result, returning the owned hits.

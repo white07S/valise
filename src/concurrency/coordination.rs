@@ -376,6 +376,8 @@ mod tests {
     #[test]
     fn region_does_not_overflow_header() {
         // Compile-time check duplicated at runtime for safety.
-        assert!(COORD_REGION_OFFSET + COORD_REGION_SIZE <= HEADER_SIZE);
+        const {
+            assert!(COORD_REGION_OFFSET + COORD_REGION_SIZE <= HEADER_SIZE);
+        }
     }
 }

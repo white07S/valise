@@ -13,13 +13,13 @@
 //!
 //! Phase 6 (impact-vote-rerank):
 //! - The hot dense buffers (`dots`, `scores`, `touched`) are reused
-//!   across queries via a thread-local [`QueryArena`] with a
+//!   across queries via a thread-local `QueryArena` with a
 //!   generation counter — zero `Vec<f32>` allocations and zero page
 //!   faults on the hot path.
 //! - When `channel_k` is set, the vote phase reads only the first
 //!   `channel_k` entries of each query term's posting list, with
 //!   entries pre-sorted by descending `term_freq` at decode time
-//!   (lazily cached in [`Bm25QueryCache::impact_postings`]). This
+//!   (lazily cached in `Bm25QueryCache::impact_postings`). This
 //!   bounds the candidate set to `|q| · channel_k` regardless of
 //!   corpus size.
 //! - An exact-rerank phase recomputes the true dot product for the
@@ -855,7 +855,7 @@ fn exact_tfidf_sum(
 /// so the highest-energy contributions for the term cluster at the
 /// head of the list.
 ///
-/// Cached in [`Bm25QueryCache::impact_postings`] behind an `Arc` so
+/// Cached in `Bm25QueryCache::impact_postings` behind an `Arc` so
 /// concurrent queries clone the pointer, not the buffers. The same
 /// single-decode pass also caches the frame_id-sorted original under
 /// [`Bm25QueryCache::decoded_postings`] so the rerank phase can

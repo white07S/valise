@@ -99,7 +99,29 @@ impl TryFrom<u16> for SegmentType {
 pub enum Compression {
     None = 0,
     Zstd = 1,
+    /// Reserved discriminant. **No encoder emits it and no decoder can
+    /// read it** — see `Compression::ensure_decodable`. It exists so the
+    /// wire value 2 stays claimed for a future LZ4 codec rather than being
+    /// handed to something else.
     Lz4 = 2,
+}
+
+impl Compression {
+    /// Reject a segment this build cannot actually decompress.
+    ///
+    /// The read paths are written as `if compression == Zstd { decompress }
+    /// else { use the bytes as-is }`. Without this guard an `Lz4` segment
+    /// would take the else branch and compressed bytes would be returned as
+    /// though they were plaintext — silent corruption rather than an error.
+    pub(crate) fn ensure_decodable(self) -> Result<()> {
+        match self {
+            Self::None | Self::Zstd => Ok(()),
+            Self::Lz4 => Err(Error::Unsupported(
+                "segment is LZ4-compressed; this build only decodes zstd (wire code 2 is reserved but unimplemented)"
+                    .into(),
+            )),
+        }
+    }
 }
 
 impl TryFrom<u16> for Compression {

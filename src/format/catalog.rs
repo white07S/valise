@@ -138,7 +138,7 @@ pub struct AnalyzerDesc {
     /// canonical postings still include stopword tokens (the v1 default;
     /// see spec §10.4).
     pub stopword_query_only: bool,
-    /// Built-in stopword set applied inside [`crate::text::analyzer::Analyzer`]
+    /// Built-in stopword set applied inside `crate::text::analyzer::Analyzer`
     /// at analyze time (both indexing and query). Independent of the
     /// reference-resolved `stopword_set_ref` path; left as
     /// [`StopwordsPolicy::None`] for the legacy Valise defaults and set to

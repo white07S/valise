@@ -40,11 +40,11 @@ jobs:
       - name: Formatting
         run: cargo fmt --all --check
 
-      # The crate denies print_stdout/print_stderr/dbg_macro, so lint
-      # violations fail here as errors. Style warnings are not yet fatal —
-      # see the tracking issue before adding `-D warnings` to this step.
+      # Warnings are errors. The deliberate exceptions live in
+      # `[lints.clippy]` in Cargo.toml with a justification each, so a new
+      # warning here means either fix it or argue for it in the manifest.
       - name: Clippy
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Build (default features)
         run: cargo build --all-targets
@@ -59,11 +59,13 @@ jobs:
       - name: Test
         run: cargo test --all-targets
 
-      # Builds the surface docs.rs will publish. Broken intra-doc links are
-      # still warnings here rather than errors — see the tracking issue for
-      # driving them to zero and adding `RUSTDOCFLAGS: -D warnings`.
+      # Builds the surface docs.rs will publish. Broken intra-doc links fail
+      # the build: they render as dead links on docs.rs, which is the main
+      # discovery surface for a Rust crate.
       - name: Doc build
         run: cargo doc --no-deps --no-default-features
+        env:
+          RUSTDOCFLAGS: -D warnings
 
   # Apple silicon: NEON kernels and the macOS file-locking paths have no
   # coverage on Linux. Kept to a single build+test on pushes to main so the

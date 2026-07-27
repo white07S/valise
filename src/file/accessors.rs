@@ -88,7 +88,7 @@ impl ValiseFile {
     }
 
     /// Vectors that are members of `collection_id`, sorted ascending by id.
-    /// Same semantics as [`collection_member_frames`].
+    /// Same semantics as `collection_member_frames`.
     #[must_use]
     pub fn collection_member_vectors(&self, collection_id: CollectionId) -> &[VectorId] {
         self.collection_filter_cache

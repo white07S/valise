@@ -121,15 +121,15 @@ pub struct TocFooterCodec;
 impl TocFooterCodec {
     /// Encode a body into a fully self-validating `TocFooter`.
     ///
-    /// The on-disk shape carries TWO embedded checksums (see [`encode`]):
+    /// The on-disk shape carries TWO embedded checksums (see `encode`):
     ///   - `body_checksum` at offset 24..56 — BLAKE3 over the body bytes.
     ///   - `footer_checksum` at offset 56..88 — BLAKE3 over the
     ///     header fields (magic | version | header_len | snapshot_gen |
     ///     body_len | body_checksum) AND the body bytes.
     ///
-    /// Because both are present on disk, [`decode`] alone catches any
+    /// Because both are present on disk, `decode` alone catches any
     /// single-byte corruption in EITHER the body or the header
-    /// fields, without needing to consult [`crate::format::header::Header::toc_checksum`].
+    /// fields, without needing to consult `crate::format::header::Header::toc_checksum`.
     /// The header copy is a redundant belt-and-suspenders cross-check
     /// that will be removed in the v3 format.
     pub fn encode_body(body: TocFooterBody) -> Result<TocFooter> {

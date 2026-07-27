@@ -220,6 +220,7 @@ impl Snapshot {
         // (≤ ~4 MiB per batch) and the read path is cold.
         let start = segment.offset as usize;
         let compression_code = u16::from_le_bytes([mmap[start + 24], mmap[start + 25]]);
+        crate::format::segment::Compression::try_from(compression_code)?.ensure_decodable()?;
         let payload = if compression_code == crate::format::segment::Compression::Zstd as u16 {
             let end = payload_ref
                 .bytes_offset

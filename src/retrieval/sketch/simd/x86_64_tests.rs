@@ -120,7 +120,7 @@ fn both_variants_agree_on_large_n() {
     // 10_000 independent samples per variant — catches reduction-
     // overflow bugs (each i8 lane in the shuffle path can saturate
     // at 256 after 32 chunks if the per-chunk SAD is hoisted).
-    let mut prng = SplitMix64::new(0x100A_B0B);
+    let mut prng = SplitMix64::new(0x0100_AB0B);
     for _ in 0..10_000 {
         let words = ((prng.next_u64() as usize) & 0x7F) | 1; // 1..128
         let (a, b) = {

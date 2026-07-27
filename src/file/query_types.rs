@@ -81,7 +81,7 @@ pub enum QueryAlgorithm {
 /// `channel_k`.
 pub(crate) const DEFAULT_SKETCH_CANDIDATE_BUDGET: usize = 2048;
 
-/// Input to [`ValiseFile::vector_search`].
+/// Input to [`ValiseFile::vector_search`](crate::ValiseFile::vector_search).
 ///
 /// Dispatch is implicit per embedding space: a QAM(5,6) space uses the
 /// in-memory sign-sketch scan + QAM-sliding rerank; any other space falls back
@@ -111,7 +111,7 @@ pub struct VectorSearchQuery {
 impl VectorSearchQuery {
     /// Accurate search: sketch-select the default candidate budget, then run
     /// the f32 rerank pass (`VectorFidelity::Full`). Leaves `channel_k` unset
-    /// so it uses [`DEFAULT_SKETCH_CANDIDATE_BUDGET`], which is sized to reach
+    /// so it uses `DEFAULT_SKETCH_CANDIDATE_BUDGET`, which is sized to reach
     /// the codec's recall ceiling. Pass an explicit `channel_k` to trade
     /// recall for latency. This is the engine-level target a higher layer's
     /// "accurate rerank" lowers to.
@@ -143,7 +143,7 @@ impl VectorSearchQuery {
     }
 }
 
-/// Vector hit produced by [`ValiseFile::vector_search`]. Score follows
+/// Vector hit produced by [`ValiseFile::vector_search`](crate::ValiseFile::vector_search). Score follows
 /// the "smaller = more similar" codec convention.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VectorHit {
@@ -153,7 +153,7 @@ pub struct VectorHit {
     pub score: f32,
 }
 
-/// Per-stage wall-clock breakdown of a [`ValiseFile::vector_search_traced`]
+/// Per-stage wall-clock breakdown of a [`ValiseFile::vector_search_traced`](crate::ValiseFile::vector_search_traced)
 /// call. Sum of fields ≈ total call cost. `rerank_full` is zero when the
 /// caller did not request [`VectorFidelity::Full`].
 #[derive(Clone, Copy, Debug, Default)]
@@ -180,7 +180,7 @@ pub struct SketchScanTimings {
     pub accumulate: std::time::Duration,
 }
 
-/// Input to [`ValiseFile::time_range_query`], spec §17. `from` and `to` are
+/// Input to [`ValiseFile::time_range_query`](crate::ValiseFile::time_range_query), spec §17. `from` and `to` are
 /// inclusive Unix epoch seconds. Empty range (`from > to`) yields no hits.
 #[derive(Clone, Copy, Debug)]
 pub struct TimeQuery {
@@ -190,7 +190,7 @@ pub struct TimeQuery {
     pub collection_id: Option<CollectionId>,
 }
 
-/// Input to [`ValiseFile::query_hybrid`], spec §18.3.
+/// Input to [`ValiseFile::query_hybrid`](crate::ValiseFile::query_hybrid), spec §18.3.
 ///
 /// One text channel (running an indexed retrieval profile) and one vector
 /// channel are fused under `fusion_profile_id`. Either channel may be left
@@ -223,7 +223,7 @@ pub struct HybridVectorChannel {
     pub fidelity: VectorFidelity,
 }
 
-/// Fused hit produced by [`ValiseFile::query_hybrid`]. `score` follows the
+/// Fused hit produced by [`ValiseFile::query_hybrid`](crate::ValiseFile::query_hybrid). `score` follows the
 /// "higher = better" convention (vector distances are flipped before
 /// fusion so all channels share direction).
 #[derive(Clone, Copy, Debug, PartialEq)]

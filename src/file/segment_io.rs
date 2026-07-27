@@ -235,6 +235,7 @@ fn read_segment(
     let mut payload = vec![0u8; header.payload_length as usize];
     file.read_exact(&mut payload)?;
     header.validate_payload(&payload)?;
+    header.compression.ensure_decodable()?;
     if header.compression == Compression::Zstd {
         let decompressed = zstd::decode_all(payload.as_slice())
             .map_err(|err| Error::Format(format!("zstd decode failed: {err}")))?;
@@ -308,6 +309,7 @@ pub(super) fn read_payload_ref(
             "payload segment length exceeds file size".into(),
         ));
     }
+    header.compression.ensure_decodable()?;
     if header.compression == Compression::Zstd {
         // Compressed Payload: read the full segment payload off disk,
         // decompress, then slice. Less efficient than the uncompressed

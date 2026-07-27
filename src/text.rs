@@ -2,7 +2,7 @@
 //!
 //! Phase 2 introduces:
 //!
-//! - analyzer primitives ([`normalize`], [`tokenize`]) — Task #25
+//! - analyzer primitives (`normalize`, `tokenize`) — Task #25
 //! - the composable analyzer driven by [`AnalyzerDesc`] — Task #26
 //! - canonical text segments (term dictionary, postings, doc stats) — Group C
 //! - retrieval algorithms (BM25, TF-IDF, Jaccard) — Group E

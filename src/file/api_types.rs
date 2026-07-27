@@ -46,7 +46,7 @@ impl Default for CreateOptions {
 }
 
 /// Whether text retrieval is enabled for a file. Pinned at create
-/// time; read-only thereafter via [`ValiseFile::text_enabled`].
+/// time; read-only thereafter via [`ValiseFile::text_enabled`](crate::ValiseFile::text_enabled).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TextMode {
     Enabled,
@@ -118,7 +118,7 @@ impl CreateOptions {
     }
 }
 
-/// Input to [`ValiseFile::put_frame`]. The payload is borrowed for the
+/// Input to [`ValiseFile::put_frame`](crate::ValiseFile::put_frame). The payload is borrowed for the
 /// duration of the call — `put_frame` writes it synchronously to a
 /// `Payload` segment and copies whatever metadata it needs into its own
 /// in-memory state. Callers can pass `&[u8]` (string literals, slices
@@ -165,7 +165,7 @@ impl<'a> PutFrame<'a> {
     }
 }
 
-/// Input to [`ValiseFile::put_vector`]. `values` is borrowed for the
+/// Input to [`ValiseFile::put_vector`](crate::ValiseFile::put_vector). `values` is borrowed for the
 /// duration of the call — `put_vector` `extend_from_slice`s the floats
 /// into a single contiguous per-batch buffer (one allocation amortized
 /// across the whole batch, regardless of how many `put_vector` calls
@@ -200,7 +200,7 @@ pub enum Reconstruct {
     F32Vector,
 }
 
-/// Output of [`ValiseFile::read_vector`]. The variant matches the
+/// Output of [`ValiseFile::read_vector`](crate::ValiseFile::read_vector). The variant matches the
 /// [`Reconstruct`] passed in.
 #[derive(Clone, Debug)]
 pub enum ReadVectorResult {

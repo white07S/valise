@@ -3,7 +3,7 @@
 //! Replaces the old CSR vote index. Each active vector contributes a
 //! 1-bit-per-dimension sign sketch of its rotated reconstruction —
 //! derived for free from the QAM phase codes at file-open (see
-//! [`crate::codec::qam_sliding::QamSlidingEngine::sign_sketch`]), so
+//! `crate::codec::qam_sliding::QamSlidingEngine::sign_sketch`), so
 //! nothing extra is persisted. At query time we popcount-Hamming the
 //! query's sign sketch against every active vector's (full coverage,
 //! O(N) but cache-sequential SIMD) and counting-sort the closest

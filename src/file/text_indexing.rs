@@ -194,6 +194,7 @@ impl PostingListSoA {
 ///   fast path. Each segment directory has fixed-size 24-byte entries
 ///   pointing at varint blob slices; lazy decode happens on the BM25 hot
 ///   path, ~3 µs per query term.
+///
 /// Read-time scratch caches for BM25. Populated lazily on the first query
 /// and cleared on any mutation that changes `doc_lengths` or the active-row
 /// status. Held under `parking_lot::Mutex` so query callers can update them

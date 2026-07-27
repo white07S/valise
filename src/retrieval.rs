@@ -37,16 +37,20 @@ pub mod sketch_bench {
         sketch::hamming_scalar(a, b)
     }
 
-    /// SAFETY: caller must have verified `avx2` and `popcnt` CPU
-    /// support before calling.
+    /// # Safety
+    ///
+    /// Caller must have verified `avx2` and `popcnt` CPU support before
+    /// calling.
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn hamming_avx2_popcnt(a: &[u64], b: &[u64]) -> u32 {
         unsafe { sketch::hamming_x86_64_bench::hamming_popcnt(a, b) }
     }
 
-    /// SAFETY: caller must have verified `avx2` and `popcnt` CPU
-    /// support before calling.
+    /// # Safety
+    ///
+    /// Caller must have verified `avx2` and `popcnt` CPU support before
+    /// calling.
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn hamming_avx2_shuffle(a: &[u64], b: &[u64]) -> u32 {
