@@ -56,7 +56,21 @@ That's the whole setup. No daemon, no connection string, no index build.
 Take a copy of your corpus *while it is being written*, move it to a machine
 with a different OS and a different instruction set, and open it there.
 
-On a 171,000-document hybrid corpus:
+<div align="center">
+  <img src=".github/copy-under-write.gif"
+       alt="A writer commits continuously to corpus.vls while 50 plain cp copies are taken; all 50 open to a consistent snapshot and are queryable."
+       width="100%">
+  <br>
+  <sub>Real recording, not a mockup — <a href="demo/copy-under-write.tape">the tape</a> and
+  <a href="demo/">the scripts</a> are in this repo. Reproduce it with <code>demo/record.sh</code>.</sub>
+</div>
+
+Fifty copies with plain `cp`, no lock and no coordination, taken across twenty
+distinct commit generations while the writer never paused. Every one opened to
+a consistent snapshot, landed exactly on a commit boundary, and answered
+queries.
+
+At larger scale, on a 171,000-document hybrid corpus:
 
 | <sub>[†](#check-the-numbers-yourself)</sub> | **Valise** | Tantivy + USearch + payloads | SQLite + FTS5 + sqlite-vec |
 |---|---:|---:|---:|
