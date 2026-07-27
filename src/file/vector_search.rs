@@ -1014,6 +1014,30 @@ pub(crate) struct VectorBasePtrs {
         std::collections::HashMap<crate::format::EmbeddingSpaceId, Vec<f32>>,
 }
 
+impl VectorBasePtrs {
+    /// Drop every cached address and mark the cache unloaded.
+    ///
+    /// `ptrs` holds **absolute addresses into the file mmap**, so any
+    /// remap invalidates all of them. Every commit remaps, which means
+    /// every commit must either rebuild this cache or call this. Leaving
+    /// stale addresses behind is a use-after-free: the next vector search
+    /// dereferences them and segfaults.
+    ///
+    /// Clearing rather than only clearing `loaded` is deliberate — a
+    /// reader that forgets the `loaded` check then sees an empty cache
+    /// (wrong, recoverable) instead of a dangling pointer (undefined).
+    pub(crate) fn invalidate(&mut self) {
+        self.ptrs.clear();
+        self.candidates_by_space.clear();
+        self.qam_norms_by_space.clear();
+        self.sketches_by_space.clear();
+        self.upq_i8_by_space.clear();
+        self.upq_dequant_by_space.clear();
+        self.stride = 0;
+        self.loaded = false;
+    }
+}
+
 /// Build the naked-pointer vector base cache: `ptrs[vid.0]` = absolute
 /// mmap address of the vector's encoded base record. Built at open +
 /// every commit (after `mmap_remap`). Tombstoned vectors and the slot-0

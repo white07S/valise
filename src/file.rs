@@ -162,10 +162,14 @@ pub struct ValiseFile {
     /// tombstoned-vector slots are 0 (sentinel). Refreshed at every
     /// commit's mmap remap.
     ///
-    /// SAFETY: pointers are valid as long as `file_mmap` is not remapped.
-    /// `commit()` rebuilds AFTER the remap; vector_search calls
-    /// `vector_base_ptrs_for_search` before its hot loop, which lazy-loads
-    /// the cache via the inner write lock if needed.
+    /// SAFETY: pointers are valid only until `file_mmap` is remapped, and
+    /// every commit remaps. So `commit()` must, after the remap, either
+    /// rebuild this cache (when the commit touched vectors) or call
+    /// `VectorBasePtrs::invalidate` (when it did not) so the next search
+    /// lazy-loads against the new mapping. A commit that does neither
+    /// leaves dangling addresses and the next vector search is a
+    /// use-after-free — that was a real bug, see
+    /// `tests/regression_two_collection_vector_search.rs`.
     vector_base: RwLock<VectorBasePtrs>,
     id_allocator: IdAllocator,
     /// In-memory segment registry. Wrapped in `RwLock` so the read path

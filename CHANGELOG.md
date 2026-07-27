@@ -11,6 +11,44 @@ in [MIGRATION.md](MIGRATION.md).
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-07-27
+
+**Fixes a use-after-free that crashed vector search. Upgrade from any
+earlier 0.1.x.** No format change — files are compatible in both
+directions across all of 0.1.x.
+
+### Fixed
+
+- **Vector search could dereference freed memory after a commit that
+  changed no vectors, crashing the process with SIGSEGV.**
+
+  Every commit remaps the file, but the cache of vector base addresses —
+  absolute pointers into that mapping — was only rebuilt when the commit
+  had touched a vector, codec, or embedding space. A commit carrying only
+  text or payload bytes left every cached address pointing into the old
+  mapping. If the remap placed the file somewhere else, the next vector or
+  hybrid query read freed memory.
+
+  Reaching it needs nothing exotic: any capsule that holds vectors and
+  takes a commit that adds none. Two collections where only one has a
+  vector space is the obvious shape, and a single collection is enough if
+  one record arrives without its vector. It does not depend on
+  concurrency, and no data on disk is affected — the bug is entirely in
+  the in-process read cache.
+
+  The cache is now invalidated on those commits and lazily rebuilt by the
+  next search, so commits that touch no vectors still do not pay to
+  rebuild a vector index. Covered by
+  `tests/regression_two_collection_vector_search.rs`, which reproduces all
+  three shapes and fails with SIGSEGV without the fix.
+
+  This was present in every published version (0.1.0 through 0.1.3) and
+  predates the project's current name. It survived because the shape that
+  triggers it — a vectorless commit followed by a vector query on the same
+  handle — does not occur in the ingest-then-query pattern that the
+  benchmarks and test suite were built around. It was found by using the
+  library for something new.
+
 ## [0.1.3] — 2026-07-27
 
 Storage introspection, and the evidence behind the durability claims. The
@@ -150,7 +188,8 @@ and hybrid search over it with no server and no sidecar index directory.
 - Valise stores vectors; it does not generate embeddings, and it does not
   encrypt capsules.
 
-[Unreleased]: https://github.com/white07S/valise/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/white07S/valise/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/white07S/valise/releases/tag/v0.1.4
 [0.1.3]: https://github.com/white07S/valise/releases/tag/v0.1.3
 [0.1.2]: https://github.com/white07S/valise/releases/tag/v0.1.2
 [0.1.1]: https://github.com/white07S/valise/releases/tag/v0.1.1

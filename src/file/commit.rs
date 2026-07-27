@@ -274,15 +274,22 @@ impl ValiseFile {
                 vb.upq_dequant_by_space = upq_dequant_by_space;
                 vb.loaded = true;
             } else {
-                vb.ptrs.clear();
-                vb.candidates_by_space.clear();
-                vb.qam_norms_by_space.clear();
-                vb.sketches_by_space.clear();
-                vb.upq_i8_by_space.clear();
-                vb.upq_dequant_by_space.clear();
-                vb.stride = 0;
-                vb.loaded = false;
+                vb.invalidate();
             }
+        } else {
+            // The remap above happened regardless of whether any vector
+            // changed, so every address in `vector_base` is now dangling
+            // even though the vector *data* is untouched. Rebuilding here
+            // would make text-only commits pay for a vector index they
+            // did not modify, so instead drop the cache and let the next
+            // vector search lazy-load it against the new mapping via
+            // `ensure_vector_base_loaded`.
+            //
+            // Skipping this is a use-after-free. It is reachable from any
+            // file that holds vectors and takes a commit touching only
+            // text or payloads — two collections where one has no vector
+            // space is the ordinary way to get there.
+            self.vector_base.write().invalidate();
         }
         profile.by_id_cache_rebuild = t.elapsed();
 
