@@ -75,12 +75,25 @@ fn long_lived_writer_does_not_block_concurrent_readers() {
     assert!(commits >= 2, "writer must also make progress");
 }
 
+/// Eight threads, each taking the single writer, putting one frame, and
+/// committing. Regression test for a silent data-loss bug: when
+/// `WriteConnection` held no exclusion, two threads' puts interleaved over
+/// the shared payload staging buffer and the per-frame offset index that
+/// `commit` rewrites at flush, so two frames ended up pointing at the same
+/// bytes and one write vanished with `commit()` still reporting success.
+///
+/// It reproduced about one round in six, so the loop is what makes this
+/// reliable rather than a coin flip — do not lower the round count.
 #[test]
 fn concurrent_committers_all_succeed() {
+    for round in 0..80 {
+        concurrent_committers_round(round);
+    }
+}
+
+fn concurrent_committers_round(round: usize) {
     // Eight writer threads, each opens its own write transaction, does
-    // a put_frame + commit, drops. Without the pipeline's exclusion
-    // they'd race on `ValiseFile`'s internal state; with it they
-    // serialize and all succeed.
+    // a put_frame + commit, drops.
     let dir = tempdir().unwrap();
     let path = dir.path().join("concurrent.vls");
     make_file(&path);
@@ -133,7 +146,11 @@ fn concurrent_committers_all_succeed() {
     let final_db = Database::open(&path, OpenMode::ReadOnly).unwrap();
     let reader = final_db.reader();
     let stubs = reader.frame_stubs();
-    assert_eq!(stubs.len(), 9, "seed + 8 frames must all be durable");
+    assert_eq!(
+        stubs.len(),
+        9,
+        "round {round}: seed + 8 frames must all be durable"
+    );
     let payloads: std::collections::HashSet<String> = stubs
         .iter()
         .filter_map(|s| reader.read_raw_text(s.frame_id).ok())
@@ -141,16 +158,16 @@ fn concurrent_committers_all_succeed() {
     for i in 0..8 {
         assert!(
             payloads.contains(&format!("frame-{i}")),
-            "frame-{i} was lost; recovered {payloads:?}"
+            "round {round}: frame-{i} was lost; recovered {payloads:?}"
         );
     }
 }
 
 #[test]
 fn pipeline_fifo_under_concurrency() {
-    // Spawn 16 writers, capture commit start order, assert the
-    // checkpoint_seq returned by each is monotonic in arrival order.
-    // Uses a small sleep inside `submit` to force interleaving.
+    // Spawn 16 writers. Each takes the single-writer slot in turn, so
+    // they serialize; what this checks is that they all get through and
+    // that the file ends up with every frame.
     let dir = tempdir().unwrap();
     let path = dir.path().join("fifo.vls");
     make_file(&path);

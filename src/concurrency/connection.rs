@@ -8,15 +8,17 @@
 //!   pin (and may release an old mmap if no other snapshot holds it).
 //!
 //! - [`WriteConnection`]: at most one outstanding per `Database`. Holds
-//!   the underlying writer lock for the connection's lifetime. Mutating
-//!   methods (`put_frame`, `put_vector`, `commit`, …) live on the
-//!   connection so the borrow checker enforces single-writer semantics
-//!   end-to-end.
+//!   the `Database`'s single-writer slot for the connection's lifetime,
+//!   so `put_frame`/`commit` sequences from different threads cannot
+//!   interleave. `Database::writer` blocks for the slot;
+//!   `Database::try_writer` returns `None` instead of waiting.
 //!
 //! See `docs/CONCURRENCY.md`.
 
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use parking_lot::ArcMutexGuard;
 
 use crate::concurrency::database::Database;
 use crate::concurrency::snapshot::Snapshot;
@@ -228,36 +230,53 @@ impl ReadConnection {
     }
 }
 
-/// Writer handle. Stage 5++ avalanche model:
+/// Writer handle. **At most one per `Database` at a time.**
 ///
-/// - **Multiple `WriteConnection`s coexist on a single `Database`.** The
-///   per-connection writer lock from Stage 5 is gone; the
-///   `WriterPipeline`'s `commit_fsync` `GroupFsync` barrier is what
-///   orchestrates concurrent committers now.
-/// - Each write *method call* briefly takes the underlying `RwLock`
-///   write guard, mutates `ValiseFile`, releases. Readers can interleave
-///   freely between calls; concurrent `WriteConnection`s serialize on
-///   that per-call write lock for the actual mutation, not for the
-///   connection's lifetime.
-/// - **Cross-connection puts share state.** Two `WriteConnection`s'
-///   `put_frame` calls accumulate into the same in-memory catalog and
-///   shared dirty set. A `commit()` from either flushes everyone's
-///   pending writes — shared-buffer semantics for an embedded
-///   multi-writer DB (there is no WAL; the v2 format removed it). If you
-///   need isolated logical transactions, serialize at the application
-///   layer.
-/// - `commit()` runs as a *two-phase avalanche*: phase A (writes,
-///   under the inner `RwLock` write guard) → drop the lock → phase
-///   B's GroupFsync barrier (no lock; multiple committers pile in
-///   here while the leader is parked on the ~10 ms `F_FULLFSYNC`) →
-///   re-take the inner lock for the publish phase.
+/// - The connection holds the `Database`'s single-writer slot for its
+///   whole lifetime, so a `put_frame`/`commit` sequence cannot interleave
+///   with another writer's. [`Database::writer`] blocks to get here;
+///   [`Database::try_writer`] returns `None` instead of waiting. Drop the
+///   connection to release the slot.
+///
+///   This exclusion is load-bearing, not bookkeeping. Without it two
+///   writers' puts interleave over the shared payload staging buffer and
+///   the per-frame offset index that `commit` rewrites at flush, and two
+///   frames end up pointing at the same bytes — a silently lost write.
+///
+/// - Writers do **not** block readers. Each write *method call* takes the
+///   inner `RwLock` write guard, mutates, and releases it; readers
+///   interleave freely between calls.
+///
+/// - **Puts are not isolated transactions.** There is no WAL — the v2
+///   format removed it — so `put_frame` mutates the shared in-memory
+///   catalog immediately and `commit()` is the durability point for
+///   everything staged. A writer that puts and then drops without
+///   committing leaves its rows staged for the next writer's commit. If
+///   you need rollback, stage in your own buffer.
+///
+/// - `commit()` runs as a *two-phase avalanche*: phase A (writes, under
+///   the inner `RwLock` write guard) → drop the lock → phase B's
+///   GroupFsync barrier (no lock; multiple committers pile in here while
+///   the leader is parked on the ~10 ms `F_FULLFSYNC`) → re-take the
+///   inner lock for the publish phase. The barrier still coalesces
+///   fsyncs across processes sharing the file.
 pub struct WriteConnection {
     db: Arc<Database>,
+    /// The `Database`'s single-writer slot, held for this connection's
+    /// lifetime and released on drop. Never read — its value is the
+    /// exclusion itself.
+    _writer_slot: ArcMutexGuard<parking_lot::RawMutex, ()>,
 }
 
 impl WriteConnection {
-    pub(crate) fn new(db: Arc<Database>) -> Self {
-        Self { db }
+    pub(crate) fn new(
+        db: Arc<Database>,
+        writer_slot: ArcMutexGuard<parking_lot::RawMutex, ()>,
+    ) -> Self {
+        Self {
+            db,
+            _writer_slot: writer_slot,
+        }
     }
 
     /// The owning `Database`.

@@ -6,19 +6,18 @@
 //! process — opening the same file twice (by absolute path, by relative
 //! path, by symlink) collapses to one shared handle.
 //!
-//! See `docs/CONCURRENCY_PLAN.md` §6.
+//! See `docs/CONCURRENCY.md`.
 //!
 //! ## Internal structure
 //!
 //! `Database` holds the underlying `ValiseFile` behind a `parking_lot::RwLock`.
-//! Read paths take the read guard briefly per call (multi-reader
-//! concurrent); write paths take the write guard for the whole
-//! `WriteConnection` lifetime (single-writer-per-process).
+//! Both read and write paths take a guard briefly per call, so a
+//! long-lived writer never blocks readers.
 //!
-//! Stage 5's group-commit pipeline will replace the write-side `RwLock`
-//! semantics with a queueing mutex so writers serialize their commits
-//! without blocking readers; for Stage 4 the `RwLock` shape is the
-//! simplest correct implementation.
+//! Writer-vs-writer exclusion is a separate mutex, `writer_slot`, held by
+//! a `WriteConnection` for its whole lifetime. Keeping the two apart is
+//! what lets one writer stay open across many calls without stalling
+//! concurrent readers.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -44,19 +43,32 @@ type InodeKey = (u64, u64);
 
 /// Per-`(dev, ino)` shared handle. See module docs.
 pub struct Database {
-    /// The underlying `ValiseFile`, behind a `RwLock`. Stage 5: write
-    /// methods take the write guard briefly per call, not for the
-    /// connection's lifetime — cross-`WriteConnection` exclusion lives
-    /// on the `WriterPipeline` instead. Reader paths take the read
-    /// lock briefly per call.
+    /// The underlying `ValiseFile`, behind a `RwLock`. Both read and
+    /// write methods take a guard briefly per call, never for a
+    /// connection's lifetime, so a long-lived writer does not block
+    /// readers. Exclusion *between* writers is `writer_slot`, not this
+    /// lock.
     pub(crate) inner: RwLock<ValiseFile>,
-    /// Group-commit pipeline. Provides single-writer-per-`Database`
-    /// exclusion via its own mutex (decoupled from `inner`'s `RwLock`,
-    /// so long-lived writers no longer block readers — Stage 4
-    /// regression resolved). Stage 5 follow-up will route concurrent
-    /// commits through the leader/followers protocol for fsync
-    /// coalescing.
+    /// Group-commit pipeline. Coalesces concurrent committers' fsyncs
+    /// into one barrier via the leader/followers protocol.
+    ///
+    /// It does **not** provide writer exclusion — it is entered only
+    /// inside `commit()`, and it says nothing about who may call
+    /// `put_frame`. Exclusion is `writer_slot`.
     pub(crate) pipeline: WriterPipeline,
+    /// The single-writer slot. A [`WriteConnection`] holds this for its
+    /// whole lifetime, so only one writer per `Database` can exist at a
+    /// time and a `put_frame` cannot interleave with another writer's
+    /// `commit`.
+    ///
+    /// Deliberately separate from `inner`'s `RwLock`: holding a writer
+    /// must not block readers, which is why the write methods still take
+    /// `inner.write()` only per call.
+    ///
+    /// `parking_lot::Mutex` is **not reentrant** — a thread that already
+    /// holds a `WriteConnection` must drop it before asking for another,
+    /// or it will deadlock against itself.
+    pub(crate) writer_slot: Arc<parking_lot::Mutex<()>>,
     /// `(dev, ino)` identifying this file in the registry. Used at
     /// `Drop` to evict the registry entry.
     inode_key: InodeKey,
@@ -117,6 +129,7 @@ impl Database {
         let db = Arc::new(Database {
             inner: RwLock::new(valise),
             pipeline,
+            writer_slot: Arc::new(parking_lot::Mutex::new(())),
             inode_key,
         });
         registry.insert(inode_key, Arc::downgrade(&db));
@@ -149,6 +162,7 @@ impl Database {
         let db = Arc::new(Database {
             inner: RwLock::new(valise),
             pipeline,
+            writer_slot: Arc::new(parking_lot::Mutex::new(())),
             inode_key,
         });
         registry.insert(inode_key, Arc::downgrade(&db));
@@ -180,8 +194,31 @@ impl Database {
     /// additionally takes a cross-process exclusive byte lock for the
     /// duration of its disk writes. If you need isolated logical
     /// transactions, serialize writers at the application layer.
+    /// Acquire the single writer for this file.
+    ///
+    /// **Blocks** until any live [`WriteConnection`] on this `Database`
+    /// drops. Mirrors `Store::writer_owned` one layer up; use
+    /// [`Self::try_writer`] when you cannot afford to wait.
+    ///
+    /// Holding the connection is what makes a `put_frame`/`commit`
+    /// sequence atomic against other writers. Readers are unaffected —
+    /// they never contend with this slot.
+    ///
+    /// The slot is not reentrant: do not call this from a thread that
+    /// already holds a `WriteConnection` on the same `Database`.
     pub fn writer(self: &Arc<Self>) -> WriteConnection {
-        WriteConnection::new(Arc::clone(self))
+        let guard = Arc::clone(&self.writer_slot).lock_arc();
+        WriteConnection::new(Arc::clone(self), guard)
+    }
+
+    /// Non-blocking [`Self::writer`]: `None` if another writer is live.
+    ///
+    /// Mirrors `Store::try_writer_owned`. Useful where blocking is not
+    /// acceptable — an FFI thread that must release the GIL between
+    /// attempts, or a caller that would rather do other work.
+    pub fn try_writer(self: &Arc<Self>) -> Option<WriteConnection> {
+        let guard = Arc::clone(&self.writer_slot).try_lock_arc()?;
+        Some(WriteConnection::new(Arc::clone(self), guard))
     }
 
     /// `(dev, ino)` identifying this file. Useful for debugging and
