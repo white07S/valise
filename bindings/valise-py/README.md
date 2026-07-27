@@ -1,8 +1,16 @@
 # valise
 
-**Retrieval in one file.** Text search, vector search, and your documents
-packed into a single portable `.vls` file — no server, no sidecar index
-directory, no external vector database.
+**Retrieval in one file.**
+
+Your RAG prototype works. Now ship it — and suddenly the corpus isn't a thing
+you have, it's a thing you *operate*. A vector database container. An index
+directory that has to travel with the documents and stay consistent with them.
+A rebuild step in CI. The most valuable artifact you built is the one piece you
+can't hand to anyone.
+
+SQLite solved this for relational data. **Valise does it for retrieval**:
+documents, a BM25 index, compressed vectors, and the schema describing them, in
+one `.vls` file you copy, version, and query in place.
 
 ```bash
 pip install valise
@@ -39,16 +47,37 @@ re-declare, nothing to migrate.
 Note that leaving the `with` block releases the writer lock; it does **not**
 commit. `commit()` is explicit, and it is the only durability point.
 
-## Why
+## Copy it while it's being written
 
-Valise is for corpora that need to *move*: between agents, devices, eval
-runs, customer environments, air-gapped deployments. What you ship is a
-complete, queryable artifact rather than a service to stand up.
+That's the test that matters. Take a copy of a live corpus mid-write, move it
+to a machine with a different OS and instruction set, open it there. On a
+171,000-document hybrid corpus:
 
-It is **not** a hosted vector database or a distributed search cluster, and
-**it does not generate embeddings** — bring your own model. For live,
-multi-tenant, continuously-updated corpora, reach for Qdrant, LanceDB,
-Milvus, or an SQLite extension instead.
+| | **Valise** | Tantivy + USearch | SQLite + FTS5 + vec |
+|---|---:|---:|---:|
+| Mid-write copies that opened correctly | **50 / 50** | 4 / 50 | 0 / 50 |
+| Artifact | **239 MB, 1 file** | 677 MB, 62 files | 865 MB |
+
+Top-10 results come back **identical** across macOS/ARM and Linux/x86-64, from
+the same file, with no reconfiguration.
+
+## There is no index to build
+
+Every ANN library builds a graph first, and pays again whenever the corpus
+changes. Valise builds nothing: vectors are stored only as quantized codes, and
+the candidate-search sketch is derived from those same codes at open — in
+memory, never written.
+
+At 100k × 768d against recall-matched baselines: **0.50 s** to ingest and
+commit, versus 50 s for FAISS HNSW, 91 s for USearch, 139 s for hnswlib.
+**90–310× faster to build**, and nothing on disk but your data.
+
+The bill: the scan is linear, so a mature HNSW answers individual queries
+faster. If you build once and serve a billion queries over a static corpus, use
+a graph. If your corpus changes, travels, or there are thousands of small ones,
+this trade is the right way round.
+
+Valise **does not generate embeddings** — bring your own model.
 
 ## What you get
 

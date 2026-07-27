@@ -2,9 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! **Retrieval in one file.** Text search, vector search, and your
-//! documents packed into a single portable `.vls` file — no server, no
-//! sidecar index directory, no external vector database.
+//! **Retrieval in one file.**
+//!
+//! Your RAG prototype works. Now ship it — and the corpus stops being a
+//! thing you have and becomes a thing you *operate*: a vector-database
+//! container, an index directory that must travel with the documents and
+//! stay consistent with them, a rebuild step in CI. The most valuable
+//! artifact you built is the one piece you cannot hand to anyone.
+//!
+//! SQLite solved this for relational data. Valise does it for retrieval —
+//! documents, a BM25 index, compressed vectors, and the schema describing
+//! them, in one `.vls` file you copy, version, and query in place.
 //!
 //! ```
 //! use valise::prelude::*;
@@ -31,17 +39,30 @@
 //! another machine calls [`db::Store::open`] and searches immediately —
 //! nothing to re-declare and nothing to migrate.
 //!
-//! # When to reach for this
+//! # There is no index to build
 //!
-//! Valise is for corpora that need to *move*: between agents, devices,
-//! eval runs, customer environments, air-gapped deployments. The unit you
-//! ship is a complete, queryable artifact rather than a service to stand
-//! up.
+//! Every ANN library builds a graph before it answers anything, and pays
+//! again whenever the corpus changes. Valise builds **nothing**. Vectors
+//! are stored only as compact quantized codes, and the candidate-search
+//! structure — a one-bit-per-dimension sign sketch — is derived from those
+//! same codes when the file is opened. It lives in memory; nothing beyond
+//! the codes is ever written.
+//!
+//! Measured at 100k vectors × 768d against recall-matched baselines:
+//! **0.50 s** to ingest and commit, versus 50 s for FAISS HNSW, 91 s for
+//! USearch, and 139 s for hnswlib — **90–310× faster to build**, in
+//! **5–6× fewer bytes**, with no graph on disk to rebuild, invalidate, or
+//! corrupt independently of the data.
+//!
+//! The bill is that the candidate scan is linear in corpus size, so a
+//! mature graph answers individual queries faster. Prefer Valise when the
+//! corpus fits your latency budget through a scan — roughly a million
+//! vectors per millisecond at d=768 — or at any scale when it is copied,
+//! shipped, or rebuilt more often than about once per ten thousand
+//! queries. Below ~256 dimensions a tuned index wins outright.
 //!
 //! It is **not** a hosted vector database or a distributed search cluster,
-//! and **it does not generate embeddings** — bring your own model. For
-//! live, multi-tenant, continuously-updated corpora, use Qdrant, LanceDB,
-//! Milvus, or an SQLite extension instead.
+//! and **it does not generate embeddings** — bring your own model.
 //!
 //! # Two API levels
 //!

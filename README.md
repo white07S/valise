@@ -2,9 +2,7 @@
 
 # valise
 
-**Retrieval in one file.** Text search, vector search, and your documents —
-packed into a single portable `.vls` file. No server, no sidecar index
-directory, no external vector database.
+**Retrieval in one file.**
 
 [![CI](https://github.com/white07S/valise/actions/workflows/ci.yml/badge.svg)](https://github.com/white07S/valise/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/valise.svg)](https://crates.io/crates/valise)
@@ -16,33 +14,300 @@ directory, no external vector database.
 
 ---
 
-## Install
+Your RAG prototype works. Now ship it.
+
+Suddenly the corpus isn't a thing you have — it's a thing you *operate*. A
+vector database container. An index directory that has to travel with the
+documents and stay consistent with them. A rebuild step in CI. A migration
+when the schema drifts. The most valuable artifact you built, the corpus
+itself, is the one piece you can't hand to anyone.
+
+SQLite solved this for relational data thirty years ago: put the whole
+database in one file and the operational problem evaporates.
+
+**Valise does that for retrieval.** Documents, a BM25 index, compressed
+vectors, and the schema describing them — one `.vls` file. Copy it, version
+it, attach it to a release, `scp` it to an air-gapped box. Open it and query
+it in place.
 
 ```bash
-cargo add valise                    # Rust library
-cargo install valise                # `valise` command-line tool
-pip install valise                  # Python bindings
+pip install valise          # or:  cargo add valise
 ```
 
-## Quickstart
+```python
+from valise import Store, Schema, Record, Search
+
+store = Store.open("kb.vls")                    # one file, created if missing
+store.collection("notes", Schema().text("body"))
+
+with store.writer() as w:
+    w.put("notes", "doc-1", Record().text("body", "portable retrieval capsules"))
+    w.commit()
+
+store.search("notes", Search().text("body", "retrieval").top_k(10))
+```
+
+That's the whole setup. No daemon, no connection string, no index build.
+
+---
+
+## The number we care about most
+
+Take a copy of your corpus *while it is being written*, move it to a machine
+with a different OS and a different instruction set, and open it there.
+
+On a 171,000-document hybrid corpus:
+
+| <sub>[†](#check-the-numbers-yourself)</sub> | **Valise** | Tantivy + USearch + payloads | SQLite + FTS5 + sqlite-vec |
+|---|---:|---:|---:|
+| **Copies taken mid-write that opened to a correct snapshot** | **50 / 50** | 4 / 50 | 0 / 50 |
+| Deployment artifact | **239 MB** | 677 MB | 865 MB |
+| Files to move | **1** | 62 | 1 |
+| Packaging step before transfer | **none** | 23.8 s | none |
+
+Two of SQLite's "successful" copies passed `integrity_check` and then served
+bytes that differed from writes it had already acknowledged. Valise's copies
+were byte-verified against the acknowledged write set every time.
+
+And the results are the same on the far side: **identical top-10 hits for
+lexical, vector, and hybrid queries** across macOS/AArch64 and Linux/x86-64,
+from the same file, with no reconfiguration.
+
+That is the product. Everything below is why it's possible.
+
+---
+
+## There is no index to build
+
+Every ANN library builds a graph before it can answer anything. That cost
+comes back every time the corpus changes materially.
+
+Valise builds **nothing**. Vectors are stored only as compact quantized codes,
+and the candidate-search structure is derived *from those same codes* when the
+file is opened — a one-bit-per-dimension sign sketch, held in memory, scanned
+with SIMD popcount, then reranked exactly through the codec.
+
+One representation does double duty. So:
+
+| 100k vectors × 768d, matched recall <sub>[†](#check-the-numbers-yourself)</sub> | Build time |
+|---|---:|
+| **Valise** | **0.50 s** |
+| FAISS HNSW | 50.3 s — 101× slower |
+| USearch | 91.2 s — 182× slower |
+| hnswlib | 138.5 s — 277× slower |
+
+At a million vectors it's **5.5 s versus 889 s**. Across corpora the range is
+**90–310× faster to build**.
+
+The knock-on effects matter more than the number:
+
+- **Nothing on disk but your data.** No graph file, no sidecar, no `.idx`.
+- **Writes don't invalidate an index**, because there isn't one.
+- **Nothing to corrupt independently of the data.** The file *is* the index.
+- **Re-indexing from scratch becomes a reasonable default** instead of an
+  overnight job.
+
+## Vectors at 5–6× smaller
+
+Polar quantization stores each rotated coordinate pair as one joint cell index
+at **5.5 bits per dimension**. Against recall-matched graph indexes, measured
+whole-file — payload framing, IDs, catalog and all:
+
+| d=768, 100k vectors, recall@10 ≈ 0.965 <sub>[†](#check-the-numbers-yourself)</sub> | Bytes per vector |
+|---|---:|
+| **Valise** | **585 B** |
+| FAISS HNSW | 3,344 B |
+| Raw `float32` | 3,072 B |
+
+Payloads are zstd-compressed on top of that. Compare against an exact scan and
+Valise is **85–130× faster** than sqlite-vec at equal recall — 532 µs versus
+45.5 ms.
+
+## Text that doesn't need re-indexing
+
+Valise doesn't persist an engine's index image. It persists the *statistics* —
+canonical term dictionaries, frame-sorted postings, document stats — and scores
+at query time. Two consequences:
+
+**Smaller.** On BEIR corpora of 2.7M–5.4M documents, the lexical index is
+**30–43% smaller than Tantivy's** <sub>[†](#check-the-numbers-yourself)</sub>, at
+equal or better nDCG@10.
+
+**Any scorer, no rebuild.** BM25, TF-IDF cosine, count cosine, Dice, overlap,
+containment — chosen per query, over one index. A new scoring function applies
+to files that already exist without rewriting a byte.
+
+## Crash safety that went looking for trouble
+
+Commits are footer-rooted and atomic behind a single durability barrier. After
+a crash a reader sees the previous committed state or the new one, never a
+mixture. If the active footer is unusable, recovery scans back to the newest
+one that fully validates.
+
+That was tested rather than asserted: **122,200 seeded fault injections** across
+ten fault classes, plus **200 virtual-machine power cuts** over ext4, XFS and
+btrfs covering **493,931 acknowledged commits**. Zero wrong data, zero lost
+commits, zero panics.
+
+The campaign also found three real bugs in Valise — a decompression path that
+never re-hashed wire bytes, a torn commit that could render a file unopenable,
+and a trusted length field that drove a 2⁵⁴-byte allocation. All fixed, all
+now regression-tested. We'd rather tell you that than claim we wrote it
+perfectly the first time.
+
+---
+
+## The trade, stated plainly
+
+The scan is linear in corpus size. A graph's isn't. That is the bill for
+having no index:
+
+| SIFT-1M, 100k × 128d, 1,000 queries <sub>[‡](#check-the-numbers-yourself)</sub> | **Valise** | usearch (HNSW) |
+|---|---:|---:|
+| Build | **0.24 s** | 7.9 s |
+| On disk | **16.1 MiB** | 38.6 MiB |
+| Query p50 | 812 µs | **72 µs** |
+| recall@10 | 0.933 | **0.991** |
+
+**A mature HNSW answers individual queries about 11× faster, at higher recall.**
+If you build once and serve a billion queries against a static corpus, build
+the graph — use Qdrant, LanceDB, or Milvus, and be happy.
+
+The rule of thumb from the measurements: prefer Valise when the corpus fits
+your latency budget through a scan — roughly **a million vectors per
+millisecond of budget at d=768** — *or* at any scale when the corpus is
+copied, shipped, or rebuilt more often than about once per ten thousand
+queries. Below ~256 dimensions, a tuned index wins outright.
+
+**Reach for Valise when:**
+
+- **The corpus changes often.** Rebuilding is 90–310× cheaper.
+- **The corpus has to travel.** To a customer, an air-gapped site, a release
+  artifact, a container image, a colleague.
+- **You have many small corpora.** Per user, per agent, per tenant, per branch.
+  A service per corpus is absurd. A file per corpus is obvious.
+- **Reproducibility matters.** Same bytes, same results, on a different
+  machine. Pin it to an eval run. Diff two of them.
+
+**Don't, when:** you need high QPS over a large static corpus, multi-writer
+concurrency across machines, or a database that makes the embeddings for you.
+Valise stores vectors; it does not produce them.
+
+---
+
+## Beyond the quickstart
+
+<details open>
+<summary><b>Hybrid RAG — lexical catches what the embedding smooths away</b></summary>
+
+```python
+import numpy as np
+from valise import Store, Schema, Search, Vector, Rrf
+
+store = Store.open("docs.vls")
+store.collection("chunks", Schema()
+    .text("body")
+    .vector("dense", Vector(dim=384)))
+
+# One native call for the whole batch — no per-row Python loop.
+vectors = np.ascontiguousarray(model.encode(chunks), dtype=np.float32)
+with store.writer() as w:
+    w.put_many("chunks", ids, vectors, texts=chunks)
+    w.commit()
+
+def retrieve(question, k=8):
+    q = np.asarray(model.encode([question])[0], dtype=np.float32)
+    hits = store.search("chunks", Search()
+        .text("body", question)      # exact terms: error codes, SKUs, names
+        .vector("dense", q)          # paraphrase and synonymy
+        .fuse(Rrf(k=60))             # reciprocal-rank fusion
+        .top_k(k))
+    r = store.reader()
+    return [r.get("chunks", key).text for key in hits.keys]
+```
+
+Pure vector search loses the error code your user pasted in. Pure lexical
+loses the paraphrase. Running both over one index costs you one extra line.
+
+</details>
+
+<details>
+<summary><b>Agent memory — one file per agent, survives restarts</b></summary>
+
+```python
+from valise import Store, Schema, Record, Search, HalfLife
+
+store = Store.open(f"memory/{agent_id}.vls")
+store.collection("events", Schema().text("body"))
+
+def remember(text):
+    with store.writer() as w:
+        w.put("events", str(uuid4()), Record().text("body", text))
+        w.commit()
+
+def recall(cue, k=5):
+    # Recent memories outrank stale ones at the same lexical score.
+    return store.search("events", Search()
+        .text("body", cue)
+        .recency(HalfLife(days=7))
+        .top_k(k))
+```
+
+Back it up by copying it. Inspect it with `valise info memory/agent-7.vls`.
+Ship a pre-warmed memory with the agent by committing the file.
+
+</details>
+
+<details>
+<summary><b>Time-partitioned logs — query a window, drop a range</b></summary>
+
+```python
+from valise import Store, Schema, Partition, Window, Search
+
+store = Store.open("logs.vls")
+logs = store.partitioned("logs", Schema().text("message"), Partition.BY_DAY)
+
+view = logs.view(Window.last_days(7))
+hits = store.search_view(view, Search().text("message", "timeout").top_k(20))
+
+logs.forget_before(cutoff)        # drop whole partitions, not row-by-row
+```
+
+</details>
+
+<details>
+<summary><b>Ship a queryable artifact through CI</b></summary>
+
+```bash
+python build_index.py && ls -lh kb.vls        # 16 MiB, one file
+
+# Attach to a GitHub release, then anywhere:
+valise info   kb.vls                           # what's in here?
+valise search kb.vls notes "quantization" --top-k 5
+valise export kb.vls > kb.jsonl                # your data, no library required
+```
+
+The CLI ships with the crate. `export` streams JSON Lines, so **your data is
+never locked in** — you can walk an entire capsule without writing code.
+
+</details>
+
+<details>
+<summary><b>The same thing in Rust</b></summary>
 
 ```rust
 use valise::prelude::*;
 
-let store = Store::open("kb.vls")?;                 // open-or-create
+let store = Store::open("kb.vls")?;
 store.collection("notes", Schema::new()
-    .text("body")                                   // English BM25 default
-    .vector("dense", Vector::dim(768)))?;           // cosine + QAM default
+    .text("body")
+    .vector("dense", Vector::dim(768)))?;
 
 let mut w = store.writer();
-w.put(
-    "notes",
-    "doc-1",
-    Record::new()
-        .text("body", "portable retrieval capsules")
-        .vector("dense", &embedding),
-)?;
-w.commit()?;                                        // durability point
+w.put("notes", "doc-1", Record::new()
+    .text("body", "portable retrieval capsules")
+    .vector("dense", &embedding))?;
+w.commit()?;
 
 let hits = store.search("notes", Search::new()
     .text("body", "retrieval capsule")
@@ -50,205 +315,88 @@ let hits = store.search("notes", Search::new()
     .top_k(10))?;
 ```
 
-Schemas are persisted in the file. A later run — or a different process, or
-a different machine — calls `Store::open("kb.vls")` and searches immediately,
-with no schema re-declaration and nothing to migrate.
-
-```bash
-cargo run --example quickstart      # runs the above end to end, no data needed
-```
-
-<details>
-<summary><b>The same thing in Python</b></summary>
-
-```python
-import numpy as np
-from valise import Store, Schema, Vector, Record, Search
-
-store = Store.open("kb.vls")
-store.collection("notes", Schema().text("body").vector("dense", Vector(dim=768)))
-
-with store.writer() as w:
-    w.put("notes", "doc-1",
-          Record().text("body", "portable retrieval capsules")
-                  .vector("dense", np.asarray(embedding, dtype=np.float32)))
-    w.commit()   # the durability point — leaving the block only releases the lock
-
-hits = store.search("notes",
-    Search().text("body", "retrieval capsule").vector("dense", query).top_k(10))
-```
-
-For a batch, `w.put_many(coll, keys, vectors, texts=...)` ingests a
-C-contiguous `float32` `[N, dim]` array in one native call instead of a
-per-row Python loop. See the
-[Python quickstart](bindings/valise-py/docs/quickstart.md).
-
 </details>
 
-## Inspect a capsule from the shell
+---
 
-```console
-$ valise info kb.vls
-kb.vls
-  size            11.0 KiB
-  records         4 active / 4 total
-  vectors         4 active / 4 total
-  tombstones      0.0%
-  collections     1
-    - notes
+## Check the numbers yourself
 
-$ valise search kb.vls notes "vector quantization" --top-k 3
-  1. polar-q                          0.0164
-  2. capsule                          0.0161
+**‡ — reproducible here, in two commands.** The SIFT-1M figures in
+[the trade](#the-trade-stated-plainly) come from a benchmark in this repo. It builds the Valise index and
+runs Tantivy, usearch, and hnsw_rs in the same process over identical data and
+ground truth:
 
-$ valise export kb.vls > kb.jsonl        # every record, as JSON Lines
+```bash
+python3 bench/prep_data.py all-small     # fetches BEIR scifact + SIFT-1M
+cargo build --release -p valise-bench --bin valise-e2e-bench
+target/release/valise-e2e-bench \
+    --beir-dir bench/beir-data/scifact \
+    --vector-dir bench/datasets/sift-1m \
+    --vector-n 100000 --out bench/results/e2e.json
 ```
 
-`info`, `search`, and `get` take `--json`; `export` always emits JSON Lines.
-Your data is never locked in — `export` walks a whole capsule without
-touching the library.
+[bench/REPRODUCE.md](bench/REPRODUCE.md) documents every knob, the x86-64 AVX2
+results, and the cases where Valise loses.
 
-## Why Valise
+**† — from a larger study, not reproducible here yet.** The portability,
+build-time, storage, lexical-size and crash-campaign figures come from runs at
+100k–1M vectors against recall-matched baselines, on corpora that need separate
+download (some behind a gated licence). The methodology is written up in an
+accompanying systems paper. We keep these visually separate from the ‡ numbers
+rather than blending them, because you can check one set today and have to take
+our word on the other — and you shouldn't have to guess which is which.
 
-AI applications increasingly need context that can *move* — between agents,
-devices, eval runs, customer environments, and air-gapped deployments.
-Vector databases are strong for live shared services, but they are awkward
-when the unit you want to distribute is a complete, queryable knowledge
-artifact.
+---
 
-Reach for Valise when a corpus should be:
+## Two API levels
 
-- **self-contained** — documents, text index, vectors, schemas, and metadata
-  in one file
-- **local-first** — query with no hosted service and no Docker sidecar
-- **reproducible** — ship the identical retrieval artifact to tests, users,
-  agents, or customer sites
-- **crash-safe** — append-only commits rooted at a footer TOC, fuzzed against
-  torn writes
-- **hybrid** — lexical and vector search in the same embedded runtime
-
-### What it is not
-
-Valise is not a hosted vector database, a distributed search cluster, or an
-embedding model. **It stores vectors; it does not produce them** — bring your
-own model.
-
-For live, multi-tenant, continuously updated production corpora, use Qdrant,
-LanceDB, Milvus, Pinecone, Weaviate, Chroma, or an SQLite extension. Use
-Valise when the retrieval corpus itself should be portable, inspectable,
-reproducible, or embedded directly into an application.
-
-## Retrieval model
-
-Valise owns its retrieval primitives rather than embedding an opaque search
-engine blob.
-
-**Text** — BM25; TF-IDF cosine and count cosine; approximate cosine variants;
-Dice, overlap, and containment set scorers; canonical term dictionaries,
-postings, and document statistics.
-
-**Vectors** — QAM Lloyd-Max polar codec (default `(5, 6)` bits); UPQ polar
-codec family, opt-in per field; an in-memory sign-sketch candidate scan
-derived from the stored codes; codec-specific rerank paths. There is no
-persisted HNSW graph or IVF index — and therefore no index to rebuild, and
-nothing on disk but the capsule.
-
-Hybrid search fuses the two channels at query time, with RRF as the
-application-layer default.
-
-## API levels
-
-| Level | Entry point | Use it for |
+| Level | Entry point | For |
 |---|---|---|
-| Application | `valise::prelude` / `db::Store` | keyed records, schemas, text/vector/hybrid search, partitions, compaction |
-| Engine | `ValiseFile` / `Database` | explicit catalog registration, frame and vector primitives, raw format work |
-| Python | `valise` on PyPI | typed Python facade over the same application concepts |
+| **Application** | `import valise` / `valise::prelude` | Keyed records, schemas, text/vector/hybrid search, partitions, compaction. **Start here.** |
+| **Engine** | `ValiseFile` / `Database` | Explicit catalog registration, frame and vector primitives, raw format work. |
 
-Start at the application layer. The engine is for extending the format or
-embedding Valise inside another storage system.
+The Python package is a typed facade over the same concepts — full type hints
+under `mypy --strict`, strict enums instead of magic strings, vectors crossing
+the FFI boundary zero-copy.
 
 ## Status
 
-Pre-1.0 and under active development.
+Pre-1.0 and moving. Below 1.0, minor versions may break the API and the
+on-disk format; every format change is recorded in [MIGRATION.md](MIGRATION.md)
+and caught by a golden-hash test.
 
-- **Format** — on-disk line v2.4 (`FORMAT_MAJOR = 2`, `FORMAT_MINOR = 3`).
-  Byte layout is pinned by a golden-hash test; changes are documented in
-  [MIGRATION.md](MIGRATION.md).
-- **Concurrency** — N readers and a single leader-batched writer, coordinated
-  across processes through an in-header region with mmap snapshots.
-- **Stability** — while the version is below 1.0, minor versions may break
-  both the API and the on-disk format.
-- **Platforms** — Linux and macOS, on x86-64 and aarch64. **Windows is not
-  supported yet**: the commit protocol uses positional file IO and fcntl
-  OFD advisory locks, and the Windows equivalents are not implemented.
-  Building on Windows fails with an explicit message rather than a wall of
-  type errors.
+**Platforms:** Linux and macOS on x86-64 and aarch64. **Windows is not
+supported yet** — the commit protocol relies on positional file IO and fcntl
+OFD advisory locks, and the Windows equivalents are not implemented.
+
+**Known limitation:** `ReadConnection`'s search methods are not served from the
+pinned snapshot; catalog and payload reads are. A query issued after a
+concurrent commit can return a frame the same connection's `frame_stubs()`
+does not list. Call `refresh_snapshot()` when the two must agree.
 
 ## Documentation
 
-| Document | Contents |
+| | |
 |---|---|
+| [Python docs](https://white07S.github.io/valise) | Quickstart, concepts, full API reference |
+| [docs.rs](https://docs.rs/valise) | Rust API |
 | [docs/FORMAT.md](docs/FORMAT.md) | On-disk format, commit and recovery protocol |
-| [docs/SIMPLE_API_SPEC.md](docs/SIMPLE_API_SPEC.md) | Application API contract |
-| [docs/VECTOR_SEARCH.md](docs/VECTOR_SEARCH.md) | Vector-search design, recall/latency envelope, failed experiments |
-| [docs/EXTENDING.md](docs/EXTENDING.md) | Adding scorers or codec families |
+| [docs/VECTOR_SEARCH.md](docs/VECTOR_SEARCH.md) | Sketch design, recall/latency envelope, failed experiments |
 | [docs/CONCURRENCY.md](docs/CONCURRENCY.md) | Reader/writer model and decision log |
-| [docs/PARITY.md](docs/PARITY.md) | Rust ↔ Python surface parity |
-| [bench/REPRODUCE.md](bench/REPRODUCE.md) | How to regenerate every published number |
-
-## Repository layout
-
-| Path | Contents |
-|---|---|
-| `src/db/` | Application layer: `Store`, schema registry, identity, records, search, partitions, compaction |
-| `src/file/` | Engine lifecycle: catalogs, segments, codecs, text indexing, vector search, TOC IO |
-| `src/format/` | On-disk codecs and persisted structs |
-| `src/codec/` | Vector codec families and SIMD kernels |
-| `src/retrieval/` | Lexical scorers, fusion, top-k, sign-sketch scan |
-| `src/concurrency/` | Readers, writer pipeline, snapshots, coordination region |
-| `bindings/valise-py/` | Python package and PyO3 bindings |
-| `bench/` | Benchmark harnesses, peer comparisons, reproducibility notes |
-
-## Building from source
-
-```bash
-cargo build
-cargo test
-cargo clippy --all-targets
-cargo fmt --all --check
-```
-
-Python bindings:
-
-```bash
-cd bindings/valise-py
-uv venv .venv && uv pip install --python .venv maturin
-source .venv/bin/activate && maturin develop
-pytest -q python/tests
-```
+| [docs/EXTENDING.md](docs/EXTENDING.md) | Adding scorers or codec families |
+| [bench/REPRODUCE.md](bench/REPRODUCE.md) | Every published number, and how to regenerate it |
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
-build steps, the review bar, and the format invariants a change must not
-break. Security issues go through
-[private vulnerability reporting](https://github.com/white07S/valise/security/advisories/new),
-not the public tracker; see [SECURITY.md](SECURITY.md).
+Contributions welcome — [CONTRIBUTING.md](CONTRIBUTING.md) covers the build,
+the review bar, and the format invariants a change must not break. Security
+issues go through
+[private reporting](https://github.com/white07S/valise/security/advisories/new),
+not the tracker; see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[Mozilla Public License 2.0](LICENSE).
-
-In practice, for anyone using Valise:
-
-- **You can build closed-source commercial software on it.** Link Valise
-  into your application, ship it, publish nothing. MPL is file-level, not
-  viral — it does not reach your code the way GPL or AGPL would.
-- **If you modify Valise's own files**, publish those modifications. Not
-  your application, just the changed Valise files.
-- Keep the license notice on the files you received.
-
-That is the whole obligation. If you are unsure whether your use is fine,
-open a discussion — the answer is almost always yes.
-
-Contributions are accepted under the same license.
+[Mozilla Public License 2.0](LICENSE). In practice: **you can link Valise into
+closed-source commercial software and publish nothing.** MPL is file-level, not
+viral — it never reaches your code the way GPL or AGPL would. The only
+obligation is that modifications to *Valise's own files* get published.
