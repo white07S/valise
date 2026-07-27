@@ -11,6 +11,24 @@ in [MIGRATION.md](MIGRATION.md).
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-27
+
+Documentation only. No code changes; the on-disk format and the API are
+identical to 0.1.0.
+
+### Changed
+
+- Expanded the crate-level documentation, which is what docs.rs shows as
+  the landing page: what Valise is for, when *not* to reach for it, a
+  runnable quickstart, hybrid search, the durability and concurrency
+  contract, platform support, and the CLI.
+- Expanded the Python package description, which is what PyPI shows: the
+  same material with worked examples for batch ingest and for reading a
+  whole collection back. Both pages previously just linked elsewhere, and
+  neither can be edited in place — PyPI renders the description from the
+  uploaded distribution and docs.rs builds per version, so this release
+  exists to publish them.
+
 ## [0.1.0] — 2026-07-27
 
 First public release.
@@ -56,5 +74,6 @@ and hybrid search over it with no server and no sidecar index directory.
 - Valise stores vectors; it does not generate embeddings, and it does not
   encrypt capsules.
 
-[Unreleased]: https://github.com/white07S/valise/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/white07S/valise/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/white07S/valise/releases/tag/v0.1.1
 [0.1.0]: https://github.com/white07S/valise/releases/tag/v0.1.0

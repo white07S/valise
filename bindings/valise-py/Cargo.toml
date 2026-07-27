@@ -1,6 +1,6 @@
 [package]
 name = "valise-py"
-version = "0.1.0"
+version = "0.1.1"
 description = "PyO3 bindings for valise — single-file retrieval capsule"
 license = "MPL-2.0"
 repository = "https://github.com/white07S/valise"
