@@ -4,12 +4,25 @@ build-backend = "maturin"
 
 [project]
 name = "valise"
-version = "0.2.0"
+version = "0.1.0"
 description = "Python bindings for the Valise single-file AI/retrieval archive format."
 requires-python = ">=3.9"
 readme = "README.md"
 license = { text = "MPL-2.0" }
 authors = [{ name = "Valise contributors" }]
+# numpy is a hard runtime requirement, not just a test one: importing
+# `valise` pulls in `valise.query`, which imports numpy at module level,
+# and the native extension exchanges vectors over the buffer protocol.
+dependencies = ["numpy>=1.21"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Database :: Database Engines/Servers",
+    "Topic :: Text Processing :: Indexing",
+]
 
 [project.urls]
 Documentation = "https://white07S.github.io/valise"

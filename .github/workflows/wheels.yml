@@ -1,0 +1,128 @@
+name: wheels
+
+# Wheel building is expensive (macOS runners bill at ~10x Linux), so it does
+# not run on every push. It runs on demand, on release tags, and on pull
+# requests that actually touch the bindings.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "bindings/valise-py/**"
+      - "src/**"
+      - "Cargo.toml"
+      - ".github/workflows/wheels.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheels-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: bindings/valise-py
+
+jobs:
+  # The extension is built against pyo3's `abi3-py39`, so a single wheel per
+  # platform covers CPython 3.9 through whatever ships next. That is why
+  # there is no Python version axis here.
+  wheels:
+    name: wheel (${{ matrix.target }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64
+          - os: ubuntu-latest
+            target: aarch64
+          - os: macos-14
+            target: aarch64
+          - os: macos-14
+            target: x86_64
+          - os: windows-latest
+            target: x64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          # `auto` picks the oldest manylinux the toolchain supports, which
+          # is what makes the Linux wheels installable on older distros.
+          manylinux: auto
+          args: --release --out dist
+          working-directory: bindings/valise-py
+
+      # The gate that matters: install the built artifact into an empty
+      # environment and import it. This is what catches a runtime dependency
+      # missing from pyproject.toml — every other job has the `test` extra
+      # installed, which masks it.
+      #
+      # Installing the wheel file directly (rather than --find-links) is
+      # deliberate: pip must resolve the wheel's declared dependencies from
+      # PyPI exactly as a real user's `pip install valise` would. Using
+      # --no-index here would block numpy and defeat the check.
+      #
+      # Skipped where the wheel cannot run on the builder: Linux aarch64 is
+      # cross-compiled on an x86 runner, and macOS x86_64 on an arm64 one.
+      - name: Import the wheel from a clean environment
+        if: "!(matrix.os == 'ubuntu-latest' && matrix.target == 'aarch64') && !(matrix.os == 'macos-14' && matrix.target == 'x86_64')"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/clean
+          PY=/tmp/clean/bin/python
+          [ -f "$PY" ] || PY=/tmp/clean/Scripts/python
+          "$PY" -m pip install --quiet --upgrade pip
+          "$PY" -m pip install --quiet dist/*.whl
+          "$PY" - <<'EOF'
+          import os, tempfile
+          import numpy as np
+          from valise import Store, Schema, Record, Search, Vector
+
+          path = os.path.join(tempfile.mkdtemp(), "smoke.vls")
+          store = Store.open(path)
+          store.collection("kb", Schema().text("body").vector("v", Vector(dim=64)))
+          # Non-degenerate vector: a zero vector has no direction and can
+          # upset codec calibration.
+          vec = np.arange(1, 65, dtype=np.float32)
+          with store.writer() as w:
+              w.put("kb", "a", Record().text("body", "portable retrieval capsule")
+                                       .vector("v", vec))
+              w.commit()
+          hits = store.search("kb", Search().text("body", "retrieval").top_k(5))
+          assert list(hits.keys) == ["a"], hits.keys
+          print("clean-venv smoke test OK")
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}-${{ matrix.target }}
+          path: bindings/valise-py/dist
+
+  sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+          working-directory: bindings/valise-py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: bindings/valise-py/dist

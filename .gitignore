@@ -45,7 +45,10 @@ __pycache__/
 bindings/valise-py/python/valise/_native*.so
 bindings/valise-py/python/valise/_native*.pyd
 
-# Python docs build output and local venvs
+# Python docs build output, wheel/sdist output, local venvs
 bindings/valise-py/site/
+bindings/valise-py/dist/
 bindings/valise-py/.venv/
+bindings/valise-py/.buildvenv/
 bindings/valise-py/.pytest_cache/
+bindings/valise-py/.mypy_cache/

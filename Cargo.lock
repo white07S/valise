@@ -2107,7 +2107,7 @@ dependencies = [
 
 [[package]]
 name = "valise"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "arc-swap",
  "bincode 2.0.1",
@@ -2154,7 +2154,7 @@ dependencies = [
 
 [[package]]
 name = "valise-py"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "numpy",
  "pyo3",
