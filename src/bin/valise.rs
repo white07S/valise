@@ -193,7 +193,7 @@ fn info(path: &PathBuf, segments: bool, json: bool) -> Result<()> {
         let live: u64 = breakdown.iter().map(|(_, _, b)| b).sum();
         println!("\n  where the bytes are (live segments only):");
         println!(
-            "    {:<22} {:>6}  {:>12}  {:>7}",
+            "    {:<24} {:>6}  {:>12}  {:>7}",
             "segment", "count", "bytes", "share"
         );
         for (kind, count, bytes) in &breakdown {
@@ -203,7 +203,7 @@ fn info(path: &PathBuf, segments: bool, json: bool) -> Result<()> {
                 *bytes as f64 * 100.0 / live as f64
             };
             println!(
-                "    {:<22} {count:>6}  {:>12}  {pct:>6.1}%",
+                "    {:<24} {count:>6}  {:>12}  {pct:>6.1}%",
                 format!("{kind:?}"),
                 human_bytes(*bytes)
             );
