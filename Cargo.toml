@@ -1,0 +1,95 @@
+[package]
+name = "valise"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.87"
+description = "Single-file retrieval capsule for local-first AI: text and vector search over one portable file"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/white07S/valise"
+homepage = "https://github.com/white07S/valise"
+documentation = "https://docs.rs/valise"
+readme = "README.md"
+keywords = ["search", "retrieval", "vector-search", "embedded", "rag"]
+categories = ["database-implementations", "text-processing", "data-structures"]
+exclude = [
+    "bench/",
+    "bindings/",
+    "docs/",
+    ".github/",
+    ".cargo/",
+    "rust-toolchain.toml",
+]
+
+[lib]
+name = "valise"
+path = "src/lib.rs"
+
+[[bin]]
+name = "valise"
+path = "src/bin/valise.rs"
+required-features = ["cli"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+bincode = { version = "2.0.1", features = ["serde"] }
+blake3 = "1.5.1"
+uuid = { version = "1.10.0", features = ["v4", "serde"] }
+tracing = "0.1.41"
+thiserror = "2.0.17"
+libc = "0.2.186"
+zstd = "0.13.1"
+hex = "0.4.3"
+unicode-normalization = "0.1"
+unicode-segmentation = "1.10"
+rust-stemmers = "1.2"
+rustc-hash = "2.0"
+memmap2 = "0.9"
+rayon = "1.10"
+parking_lot = { version = "0.12", features = ["arc_lock"] }
+arc-swap = "1.9"
+
+# CLI-only. Pulled in by the default `cli` feature; library-only consumers
+# can drop it with `default-features = false`.
+clap = { version = "4.5", features = ["derive"], optional = true }
+
+[dev-dependencies]
+tempfile = "3.10"
+pretty_assertions = "1.4"
+
+[features]
+default = ["cli"]
+# Builds the `valise` binary. On by default so `cargo install valise` works;
+# turn it off for a leaner library dependency tree.
+cli = ["dep:clap"]
+# Re-exports the internal codec adapter types (`QamLloydMaxBench`,
+# `QamSlidingBench`, …) so the `bench/` workspace
+# crate can drive them directly. Off in production builds — the
+# adapter surface is not part of the public API.
+bench = []
+
+[lints.clippy]
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+todo = "warn"
+unimplemented = "warn"
+uninlined_format_args = "warn"
+
+[workspace]
+members = ["bench", "bindings/valise-py"]
+
+[package.metadata.docs.rs]
+# Document the library surface without the CLI's clap tree.
+no-default-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+debug = true

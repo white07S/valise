@@ -1,0 +1,51 @@
+# Build artifacts
+/target/
+**/target/
+
+# IDE / editor
+/.idea/
+/.vscode/
+*.iml
+*.swp
+*~
+
+# macOS
+.DS_Store
+
+# Local env / secrets
+.env
+.env.local
+*.local
+
+# Benchmark artifacts (regenerable — see bench/REPRODUCE.md)
+bench/data/
+bench/data-*/
+bench/datasets/
+bench/results/
+bench/logs/
+bench/cache/
+bench/REPORT.md
+bench/beir-data/
+bench/python/cache/
+bench/python/results/
+bench/python/.venv/
+
+# VM crash-campaign guest image (downloaded/built by make_initramfs.sh)
+bench/vmcrash/guest/apks/
+bench/vmcrash/guest/rootfs/
+bench/vmcrash/guest/APKINDEX*
+bench/vmcrash/guest/initramfs.cpio.gz
+bench/vmcrash/guest/vmlinuz-*
+
+# Python build artifacts
+__pycache__/
+*.pyc
+
+# Compiled extension copied in by `maturin develop`
+bindings/valise-py/python/valise/_native*.so
+bindings/valise-py/python/valise/_native*.pyd
+
+# Python docs build output and local venvs
+bindings/valise-py/site/
+bindings/valise-py/.venv/
+bindings/valise-py/.pytest_cache/

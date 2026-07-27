@@ -1,0 +1,56 @@
+name: Feature request
+description: Suggest a capability or an API change
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things are deliberately out of scope, so a request for either
+        will be closed with a pointer here:
+
+        - **Embedding generation.** Valise stores vectors; it does not
+          produce them. Bring your own model.
+        - **Distributed serving.** Sharding, replication, and network
+          protocols are outside what a single-file format does.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: >
+        Describe the situation, not the solution. What are you building,
+        and where does Valise get in the way today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: If you have an API in mind, sketch it.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >
+        Existing APIs you attempted, or other tools you are using for this
+        today.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer does this touch?
+      options:
+        - Application layer (Store, Schema, Record, Search)
+        - Engine layer (ValiseFile, Database)
+        - On-disk format
+        - CLI
+        - Python bindings
+        - Not sure
+    validations:
+      required: true

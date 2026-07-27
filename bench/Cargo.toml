@@ -1,0 +1,71 @@
+[package]
+name = "valise-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "valise-e2e-bench"
+path = "src/bin/valise-e2e-bench.rs"
+
+[[bin]]
+name = "valise-crash-campaign"
+path = "src/bin/valise-crash-campaign.rs"
+
+# Scale-ceiling benchmark: one vector store per corpus size N (real prefix
+# or noise-tiled synthetic), per-stage query profiling (VALISE_QUERY_PROFILE),
+# open decomposition, parallel + single-thread configs, fresh-process RSS.
+[[bin]]
+name = "valise-scale-bench"
+path = "src/bin/valise-scale-bench.rs"
+
+# Portability benchmark: single-file Valise vs a composed (Tantivy + usearch +
+# JSONL payloads + config) deployment. See bench/portability/.
+[[bin]]
+name = "valise-portability-bench"
+path = "src/bin/valise-portability-bench.rs"
+
+# Criterion microbenches of valise's production SIMD kernels (via the
+# bench-feature re-exports). Baselines: bench/baseline/. Run:
+#   cargo bench -p valise-bench
+[[bench]]
+name = "asymmetric_dot"
+harness = false
+
+[[bench]]
+name = "hamming"
+harness = false
+
+[[bench]]
+name = "raw_dot_int"
+harness = false
+
+[[bench]]
+name = "fwht"
+harness = false
+
+[[bench]]
+name = "pair_magnitudes"
+harness = false
+
+[dependencies]
+valise = { path = "..", features = ["bench"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytemuck = { version = "1", features = ["derive"] }
+memmap2 = "0.9"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+rayon = "1.10"
+libc = "0.2"
+# sha256 of the built Valise artifact (portability bench interop hash).
+sha2 = "0.10"
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+# Peer engines for head-to-head comparison.
+tantivy = "0.22"
+usearch = "2"
+hnsw_rs = "0.3"
+
+[lints.clippy]
+# Bench prints results — opt out of the workspace-wide print bans.

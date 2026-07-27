@@ -1,0 +1,57 @@
+name: py-docs
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write # mike pushes to gh-pages
+
+jobs:
+  build-test-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # first maturin build recompiles pyo3 (allow up to 600s)
+    defaults:
+      run:
+        working-directory: bindings/valise-py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv .venv
+      - run: uv pip install --python .venv maturin
+      - run: source .venv/bin/activate && maturin develop
+      - run: source .venv/bin/activate && uv pip install -e '.[docs,test]'
+      - run: source .venv/bin/activate && python scripts/check_native_stub.py
+      - run: source .venv/bin/activate && python -m mypy --strict python/valise
+      - run: source .venv/bin/activate && python -m pytest -q python/tests
+      - run: source .venv/bin/activate && python -m pytest -q --doctest-modules python/valise
+      - run: source .venv/bin/activate && mkdocs build --strict
+
+  deploy-docs:
+    needs: build-test-docs
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: bindings/valise-py
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # mike needs full history + the gh-pages branch
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv .venv && uv pip install --python .venv maturin
+      - run: source .venv/bin/activate && maturin develop
+      - run: source .venv/bin/activate && uv pip install -e '.[docs]'
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          source .venv/bin/activate
+          VERSION="${GITHUB_REF_NAME#v}"
+          mike deploy --push --update-aliases "$VERSION" latest
+          mike set-default --push latest

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "valise"
+version = "0.2.0"
+description = "Python bindings for the Valise single-file AI/retrieval archive format."
+requires-python = ">=3.9"
+readme = "README.md"
+license = { text = "MIT OR Apache-2.0" }
+authors = [{ name = "Valise contributors" }]
+
+[project.urls]
+Documentation = "https://white07S.github.io/valise"
+Source = "https://github.com/white07S/valise"
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.27",
+    "mike>=2.1",
+]
+test = [
+    "pytest>=8",
+    "pytest-doctestplus>=1.2",
+    "numpy>=2",
+    "mypy>=1.10",
+]
+
+[tool.maturin]
+python-source = "python"
+module-name = "valise._native"
+features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+# NOTE: --doctest-modules is intentionally NOT a global addopt. The doctest
+# gate is invoked explicitly over the facade package only:
+#   python -m pytest --doctest-modules python/valise
+# The parity suite in python/tests must NOT be run with --doctest-modules.
+# FLOAT_CMP is a pytest-doctestplus inline directive (# doctest: +FLOAT_CMP),
+# not a session-level optionflag — keep only the stdlib flags here.
+doctest_optionflags = "NORMALIZE_WHITESPACE ELLIPSIS"

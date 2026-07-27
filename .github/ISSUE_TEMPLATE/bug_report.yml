@@ -1,0 +1,58 @@
+name: Bug report
+description: Something behaves differently than documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this is a **security** issue — anything
+        involving a malformed capsule causing a crash, out-of-bounds read,
+        or corruption — please use
+        [private vulnerability reporting](https://github.com/white07S/valise/security/advisories/new)
+        instead of this form.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: >
+        The smallest code sample or sequence of `valise` commands that shows
+        the problem. If it depends on a specific capsule, say how it was
+        built.
+      render: rust
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Valise version
+      placeholder: "0.2.0, or a commit SHA"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS, architecture, and filesystem (the last one matters for durability bugs).
+      placeholder: "macOS 15.2, aarch64, APFS"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: durability
+    attributes:
+      label: Was a process interrupted?
+      description: Only relevant for corruption or missing-data reports.
+      options:
+        - label: A process was killed, crashed, or the machine lost power mid-write
+        - label: Multiple processes or threads were writing to the same capsule

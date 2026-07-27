@@ -1,0 +1,9 @@
+# Generated / downloaded guest artifacts — rebuilt by run_campaign.sh.
+guest/apks/
+guest/rootfs/
+guest/APKINDEX
+guest/APKINDEX.tar.gz
+guest/vmlinuz-virt
+guest/initramfs.cpio.gz
+guest/mods-keep/
+worker/target/

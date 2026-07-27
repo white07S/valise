@@ -1,0 +1,49 @@
+# Per-target SIMD baselines for the QAM hot kernels
+# (docs/X86_64_SIMD_PLAN.md §6).
+#
+# The arch-specific kernels in src/codec/qam_lloyd_max/simd/ and
+# src/retrieval/sketch/ have two dispatch paths:
+#
+#   - **Static (preferred):** When the build sets `target_feature
+#     = "avx2"` (etc.) — e.g. via `target-cpu = "x86-64-v3"` below —
+#     the dispatchers in `simd::*` collapse to a direct call into the
+#     AVX2 kernel at compile time, with the compiler free to inline
+#     the kernel into its caller. No runtime CPU-feature check.
+#
+#   - **Runtime fallback:** Without static feature flags (e.g. a plain
+#     `cargo build --release`), each dispatcher runs
+#     `is_x86_feature_detected!()` (one cached atomic load per call)
+#     and routes to AVX2 if available, else scalar. Works on any
+#     x86_64 chip, including pre-Haswell.
+#
+# This file gives the static path by default for the two production
+# targets:
+#
+#   - aarch64-apple-darwin: NEON is baseline-ISA — nothing extra.
+#   - x86_64-unknown-linux-gnu: x86-64-v3 (Haswell, 2013+). Covers
+#     AVX, AVX2, FMA, POPCNT, BMI1, BMI2, MOVBE, LZCNT, F16C. Drop to
+#     `-C target-cpu=x86-64-v2` if you need to ship on Westmere/IVB.
+#
+# Cross-compile (e.g. macOS → Linux) picks up the right block via the
+# `[target.<triple>]` selector. Native builds also pick up the host
+# target's block.
+
+[target.aarch64-apple-darwin]
+# NEON + dotprod (SDOT) are required by the QAM-sliding kernel; both
+# are part of the v8.2-a baseline that Apple Silicon ships.
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
+
+# Convenience aliases.
+[alias]
+# Build with native-CPU optimization (uses every feature on the host
+# CPU — the fastest possible build, but the resulting binary won't
+# run on any CPU older than yours).
+build-native = ["build", "--release", "--config", "build.rustflags=['-C', 'target-cpu=native']"]
+# Build the portable fallback (no target-cpu, runtime CPU detection,
+# works on any x86_64 from Westmere onward).
+build-portable = ["build", "--release", "--config", "target.\"cfg(target_arch = \\\"x86_64\\\")\".rustflags=[]"]

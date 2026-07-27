@@ -1,0 +1,35 @@
+[project]
+name = "valise-pybench"
+version = "0.1.0"
+description = "Third-party Python benchmark peers for Valise (vector + text), matched-recall Pareto."
+requires-python = ">=3.11"
+# Core deps are everything `datasets.py` (loaders + FAISS-Flat ground truth)
+# and the result schema need. Engine-specific peers live in extras so the
+# foundation syncs fast and never blocks on a heavy/optional wheel.
+dependencies = [
+    "numpy>=1.26",
+    "faiss-cpu>=1.8", # exact ground-truth generator + exact baseline
+    "psutil>=5.9", # peak-RSS sampling
+    "h5py>=3.16.0",
+    "huggingface-hub>=1.16.1",
+]
+
+[project.optional-dependencies]
+# `uv sync --extra vector` etc.
+vector = [
+    "lancedb>=0.13",    # disk IVF-PQ — closest design peer
+    "hnswlib>=0.8",     # in-memory HNSW — speed-ceiling reference
+    "usearch>=2.25",    # HNSW with per-vector quantization (f32/i8/b1)
+    "sqlite-vec>=0.1",  # embedded single-file exact KNN peer
+]
+text = [
+    "bm25s>=0.2",       # fast scipy-sparse BM25
+    "rank-bm25>=0.2.2", # pure-python floor
+    "pytrec-eval-terrier>=0.5.6",  # TREC-correct nDCG/MAP/MRR
+]
+pyserini = ["pyserini>=0.43"]  # Lucene gold standard — needs Java 21 on PATH
+plot = ["matplotlib>=3.8"]
+
+[tool.uv]
+# Application project, not a library — don't try to build/install ourselves.
+package = false

@@ -1,0 +1,94 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The workhorse: everything that does not need Apple silicon runs here.
+  # Linux runners are ~10x cheaper in Actions minutes than macOS ones, and
+  # x86_64 exercises the AVX2 kernels that the aarch64 job cannot.
+  check:
+    name: fmt / clippy / test (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      # The crate denies print_stdout/print_stderr/dbg_macro, so lint
+      # violations fail here as errors. Style warnings are not yet fatal —
+      # see the tracking issue before adding `-D warnings` to this step.
+      - name: Clippy
+        run: cargo clippy --all-targets
+
+      - name: Build (default features)
+        run: cargo build --all-targets
+
+      - name: Build (library only, no default features)
+        run: cargo build --no-default-features
+
+      - name: Test
+        run: cargo test --all-targets
+
+      # Builds the surface docs.rs will publish. Broken intra-doc links are
+      # still warnings here rather than errors — see the tracking issue for
+      # driving them to zero and adding `RUSTDOCFLAGS: -D warnings`.
+      - name: Doc build
+        run: cargo doc --no-deps --no-default-features
+
+  # Apple silicon: NEON kernels and the macOS file-locking paths have no
+  # coverage on Linux. Kept to a single build+test on pushes to main so the
+  # 10x minute multiplier does not apply to every pull request.
+  macos:
+    name: test (aarch64-apple-darwin)
+    if: github.event_name == 'push'
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --all-targets
+
+  # The manifest's rust-version is a promise; verify it compiles.
+  msrv:
+    name: msrv (1.87)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.87
+      - uses: Swatinem/rust-cache@v2
+      - name: Check against declared MSRV
+        run: cargo check --all-targets
+
+  # Catches an unpublishable manifest (bad metadata, missing license file,
+  # oversized tarball) before a release tag rather than after.
+  package:
+    name: cargo package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Verify the crate packages cleanly
+        run: cargo package --no-verify --allow-dirty

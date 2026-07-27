@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/white07S/valise/security/advisories/new
+    about: >
+      Report crashes, out-of-bounds reads, or corruption reachable from a
+      malformed capsule privately. Do not open a public issue.
+  - name: Question or idea
+    url: https://github.com/white07S/valise/discussions
+    about: >
+      For usage questions and open-ended design discussion. Bug reports and
+      concrete feature requests belong in an issue.

@@ -1,0 +1,24 @@
+[package]
+name = "valise-py"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "valise_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+valise = { path = "../.." }
+pyo3 = { version = "0.28", features = ["abi3-py39"] }
+numpy = "0.28"
+
+[features]
+# `extension-module` makes pyo3 skip linking libpython (it relies on the host
+# interpreter resolving the symbols at load time, via `-undefined
+# dynamic_lookup`). maturin injects it at wheel-build time (see
+# pyproject.toml `[tool.maturin] features`). Keeping it OUT of the default
+# feature set lets a plain `cargo build --workspace` / `cargo build -p valise-py`
+# link cleanly instead of failing with "symbol(s) not found" for the Python
+# C-API symbols.
+extension-module = ["pyo3/extension-module"]
