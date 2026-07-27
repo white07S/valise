@@ -15,7 +15,7 @@
 //!    pre-drain wait is honoured per call).
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -29,54 +29,62 @@ fn make_file(path: &std::path::Path) {
     valise.commit().unwrap();
 }
 
+/// A writer held open across many calls must not stall readers.
+///
+/// Deliberately *not* wall-clock bounded on either side. An earlier version
+/// ran both loops for 200 ms and asserted the writer got at least two commits
+/// in, which fails on a loaded CI runner whenever one `F_FULLFSYNC` takes
+/// longer than the window allows — a false alarm about a property the test
+/// was not even measuring. The writer now does a fixed number of commits and
+/// the reader runs for exactly as long as that takes, however long that is.
 #[test]
 fn long_lived_writer_does_not_block_concurrent_readers() {
+    const WRITER_COMMITS: u64 = 6;
+
     let dir = tempdir().unwrap();
     let path = dir.path().join("rw.vls");
     make_file(&path);
 
     let db = Database::open(&path, OpenMode::ReadWrite).unwrap();
     let mut writer = db.writer();
-    // Hold the writer for 200 ms, doing two interleaved put_frame +
-    // commit cycles. Meanwhile, a reader thread issues a series of
-    // read_payload calls — Stage 4 would have stalled the reader for
-    // the entire 200 ms; Stage 5 lets reads interleave between the
-    // writer's individual method calls.
     let cid = writer.collections()[0].collection_id;
 
     let db_reader = Arc::clone(&db);
     let reader_runs = Arc::new(AtomicU64::new(0));
     let reader_runs_handle = Arc::clone(&reader_runs);
+    let writer_done = Arc::new(AtomicBool::new(false));
+    let writer_done_handle = Arc::clone(&writer_done);
+
     let reader_thread = thread::spawn(move || {
         let reader = db_reader.reader();
-        let stubs = reader.frame_stubs();
-        let frame_id = stubs[0].frame_id;
-        let deadline = Instant::now() + Duration::from_millis(200);
-        while Instant::now() < deadline {
-            let _ = reader.read_payload(frame_id).unwrap();
+        let frame_id = reader.frame_stubs()[0].frame_id;
+        while !writer_done_handle.load(Ordering::Acquire) {
+            reader.read_payload(frame_id).unwrap();
             reader_runs_handle.fetch_add(1, Ordering::Relaxed);
-            thread::sleep(Duration::from_millis(2));
+            thread::sleep(Duration::from_millis(1));
         }
     });
 
-    // Writer does work over the same 200 ms.
-    let writer_start = Instant::now();
-    let mut commits = 0;
-    while writer_start.elapsed() < Duration::from_millis(200) {
-        let _ = writer.put_frame(PutFrame::document(cid, b"y")).unwrap();
-        let _ = writer.commit().unwrap();
-        commits += 1;
-        thread::sleep(Duration::from_millis(20));
+    // The writer stays open for all of these — one `WriteConnection` across
+    // many put/commit cycles, which is the case that used to stall readers.
+    for _ in 0..WRITER_COMMITS {
+        writer.put_frame(PutFrame::document(cid, b"y")).unwrap();
+        writer.commit().unwrap();
+        thread::sleep(Duration::from_millis(5));
     }
+    writer_done.store(true, Ordering::Release);
     drop(writer);
     reader_thread.join().unwrap();
 
+    // If the writer had blocked reads for its lifetime this would be ~0. The
+    // reader polls far faster than the writer commits, so any healthy run
+    // clears this by a wide margin — it is a liveness check, not a timing one.
     let runs = reader_runs.load(Ordering::Relaxed);
     assert!(
-        runs >= 5,
-        "reader must make progress while writer is alive (got {runs} reads, {commits} commits)",
+        runs >= WRITER_COMMITS,
+        "reader made only {runs} reads while the writer completed \
+         {WRITER_COMMITS} commits — reads appear to be blocked by the writer",
     );
-    assert!(commits >= 2, "writer must also make progress");
 }
 
 /// Eight threads, each taking the single writer, putting one frame, and
