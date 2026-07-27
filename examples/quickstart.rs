@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Prints results for the reader; stdout is this target's output channel.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 

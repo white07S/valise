@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Stable record identity: external [`Key`](crate::db::Key) → current internal
 //! ids. This is what lets the layer synthesize `update` / `delete-by-key` over
 //! an append-only engine (DB-layer plan §9.D-1).

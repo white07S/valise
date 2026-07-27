@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! AVX2 i8 SDOT-equivalent kernel for `QamSlidingEngine::raw_dot_int`
 //! (`docs/X86_64_SIMD_PLAN.md` §4.3). The hardest port of the AVX2
 //! rollout because:

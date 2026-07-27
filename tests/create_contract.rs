@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Phase 1 (consolidation plan §4): file-level create-time contract.
 //!
 //! These tests exercise the contract round-trip and the integrity guard

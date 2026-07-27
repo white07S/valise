@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Score normalization and fusion across retrieval channels, spec §18.3.
 //!
 //! Channels in v1: BM25/TF-IDF/Jaccard text scores (higher = better) and

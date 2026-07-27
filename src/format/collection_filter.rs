@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! `CollectionFilterSegment` payload codec, spec §16 (magic `VALISEF`).
 //!
 //! v1 wire form: sorted-postings lists for `collection_id → frame_id set`

@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Persisted parameter block for the UPQ (unrestricted polar) codec —
 //! the `CodecFamily::Upq` sibling of `qam_lloyd_max_params`.
 //!

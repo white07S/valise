@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Criterion microbench for `pair_magnitudes` — encode-side
 //! `√(re² + im²)` over interleaved (re, im) pairs (§4.5 of
 //! `docs/X86_64_SIMD_PLAN.md`).

@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Query-input and query-result value types for the `ValiseFile` engine
 //! surface (text / vector / hybrid / time). Re-exported from `file.rs` so
 //! the public path stays `crate::file::<Type>`.

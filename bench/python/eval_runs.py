@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """Score TREC run files with pytrec_eval against a BEIR dataset's qrels.
 
 This is the *uniform* evaluator: the Rust bench writes `valise.<ds>.run` and

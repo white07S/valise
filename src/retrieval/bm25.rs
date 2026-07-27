@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! BM25 retrieval, spec §13.1.
 //!
 //! Standard BM25 with `k1`, `b` parameters and Robertson-Sparck-Jones

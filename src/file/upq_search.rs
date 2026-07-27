@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! UPQ vector-search path: sign-sketch scan → decoded-i8 contiguous
 //! rerank → optional f32 stage over the survivors.
 //!

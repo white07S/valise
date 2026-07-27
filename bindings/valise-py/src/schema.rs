@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Schema lowering: the native [`PySchema`] builder and [`PySpace`] handle,
 //! plus the shared helpers that turn the facade's flat keyword arguments
 //! into core `Text` / `Vector` / `Codec` / `Calibrate` values.

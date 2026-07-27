@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Integration tests for persisted collection schemas (SIMPLE_API_SPEC §4):
 //! reopen needs no re-declaration. Covers the reopen-just-works contract
 //! (text + vector, deferred-then-calibrated and still-deferred UPQ),

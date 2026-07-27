@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Integration tests for the DB layer P4 maintenance: compaction (GC of
 //! tombstoned bytes via fresh-file rewrite + atomic swap), stats, and
 //! compaction after delete / forget_before.

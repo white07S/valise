@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Harness-only UPQ progressive-cache experiment.
 //!
 //! Compares the current decoded-i8 stage-2 cache against a one-byte-per-

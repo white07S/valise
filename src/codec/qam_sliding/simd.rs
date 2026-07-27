@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Per-arch SIMD kernels for the qam_sliding integer raw-dot path.
 //!
 //! Layout mirrors `codec/qam_lloyd_max/simd/` (the reference shape — see the

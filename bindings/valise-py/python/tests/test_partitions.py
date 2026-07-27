@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """Partitioned collections, windowed views, search_view, forget_before.
 
 Mirrors tests/db_partition.rs. Time routing uses record.created_at (set via

@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Free helper functions and small helper types for the `ValiseFile` engine,
 //! factored out of `file.rs` to keep the module root thin. Re-exported into
 //! the `file` module tree via `pub(in crate::file) use internals::*`.

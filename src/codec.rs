@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Vector codecs (spec §14). Two production families: `QamLloydMax`
 //! (Lloyd-Max-trained polar codebook; `QamSliding` is its fast NEON
 //! scoring kernel) and `Upq` (unrestricted polar quantization, v2.4).

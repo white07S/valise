@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Portability benchmark: Valise (single-file hybrid store) vs a COMPOSED
 //! deployment (Tantivy lexical dir + usearch vector file + JSONL payload
 //! store + config) — the USENIX FAST "portability" experiment.

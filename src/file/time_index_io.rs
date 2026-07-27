@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Time-index build and reload (Phase 3 Group F).
 //!
 //! v1: one global segment per commit, full snapshot of all active frames.

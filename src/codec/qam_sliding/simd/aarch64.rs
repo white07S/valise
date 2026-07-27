@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! NEON SDOT kernel for `QamSlidingEngine::raw_dot_int`. Free-function
 //! signature — the engine in `super` passes its `amp_table_i8`,
 //! `cos_table_i8`, `sin_table_i8` arrays explicitly so this module

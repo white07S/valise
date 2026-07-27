@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Typed view of the in-header coordination region (spec §7.1).
 //!
 //! Stage 3a: persistent layout + encode/decode + recognition. The

@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! NEON kernels for the QAM Lloyd-Max codec. Mirrors the scalar
 //! references in the parent [`super`] module — all four hot paths
 //! (`asymmetric_dot_pairs`, `symmetric_dot_pairs`, `block_hadamard_*`,

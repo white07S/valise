@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! `TermDictionarySegment` payload codec, spec §12.1 (magic `NXTD`).
 //!
 //! Each delta segment carries only newly-introduced `term_id` records for one

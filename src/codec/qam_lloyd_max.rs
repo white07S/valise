@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! QAM Lloyd-Max codec — Valise's production vector codec.
 //!
 //! Production configuration is `(amp_bits = 5, phase_bits = 6)`; see

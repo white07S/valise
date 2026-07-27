@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! `DocStatsSegment` payload codec, spec §12.4 (magic `NXTS`).
 //!
 //! Per-document statistics scoped to one `text_space_id`. Each delta

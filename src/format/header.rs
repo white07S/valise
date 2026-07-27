@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Fixed 4 KB file header, spec §7 (v2 layout).
 //!
 //! v2 (current) — Phase 4 of the WAL elimination plan. The embedded WAL

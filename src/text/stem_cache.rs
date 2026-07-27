@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! 4-way set-associative AoS memoization cache for the Porter2 stemmer.
 //!
 //! For English text with the BEIR-standard pipeline (lowercase +

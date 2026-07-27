@@ -10,7 +10,7 @@ directory, no external vector database.
 [![crates.io](https://img.shields.io/crates/v/valise.svg)](https://crates.io/crates/valise)
 [![docs.rs](https://docs.rs/valise/badge.svg)](https://docs.rs/valise)
 [![PyPI](https://img.shields.io/pypi/v/valise.svg)](https://pypi.org/project/valise/)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](#license)
 
 </div>
 
@@ -231,14 +231,18 @@ not the public tracker; see [SECURITY.md](SECURITY.md).
 
 ## License
 
-Licensed under either of
+[Mozilla Public License 2.0](LICENSE).
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
+In practice, for anyone using Valise:
 
-at your option.
+- **You can build closed-source commercial software on it.** Link Valise
+  into your application, ship it, publish nothing. MPL is file-level, not
+  viral — it does not reach your code the way GPL or AGPL would.
+- **If you modify Valise's own files**, publish those modifications. Not
+  your application, just the changed Valise files.
+- Keep the license notice on the files you received.
 
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in this work by you, as defined in the Apache-2.0
-license, shall be dual licensed as above, without any additional terms or
-conditions.
+That is the whole obligation. If you are unsure whether your use is fine,
+open a discussion — the answer is almost always yes.
+
+Contributions are accepted under the same license.

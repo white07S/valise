@@ -108,6 +108,21 @@ regenerable, and they are large.
 If you change a codec or a scoring path, include before/after numbers from
 the relevant bench in the pull request.
 
+## Licensing
+
+Valise is [MPL-2.0](LICENSE). Contributions are accepted under the same
+license — opening a pull request means you are licensing your change under
+MPL-2.0 and confirming you have the right to do so.
+
+Two practical consequences:
+
+- **Every source file carries the Exhibit A notice** (the three-line MPL
+  header). New files need it too. MPL copyleft attaches per file, so the
+  header is what marks the boundary — a file without it is ambiguous.
+- **Do not paste in code from a project under a different license**
+  without saying so in the pull request. Apache-2.0 and MIT code can be
+  relicensed into an MPL project; GPL code cannot.
+
 ## Reporting bugs
 
 Open an issue with the smallest reproduction you can manage. For anything

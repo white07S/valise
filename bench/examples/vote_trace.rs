@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! Concurrency before/after: single-query p50/p95 + recall, then a
 //! reader-thread sweep (qps / speedup / per-thread p50/p95) at the
 //! production ck = N/4. Mirrors REPRODUCE.md's concurrent-search phase.

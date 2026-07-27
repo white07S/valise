@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! `VectorDataSegment` payload codec, spec §14.2 (magic `NXVD`).
 //!
 //! The header is fixed size; the two blocks (`ids`, `base`) follow at

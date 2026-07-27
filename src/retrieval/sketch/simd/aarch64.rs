@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 //! NEON popcount-Hamming kernel for the sign-sketch scan. Lifted
 //! verbatim from `super::sketch` during the Phase 1 scaffolding split
 //! (see `docs/X86_64_SIMD_PLAN.md` §5.3); behavior is bit-identical

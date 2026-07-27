@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """Validation / error-surface parity. Engine + binding-local rejections map
 to valise.ValidationError, EXCEPT float64-at-the-numpy-boundary which rust-numpy
 raises as a Python TypeError before the binding body runs — those accept

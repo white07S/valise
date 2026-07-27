@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 """Round-trip parity: put/get, update-by-key, delete, put_auto, multi-vector,
 persistence across reopen (schema restored from file — NO re-declare).
 Mirrors tests/db_layer.rs.
