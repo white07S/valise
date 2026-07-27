@@ -11,8 +11,12 @@ env:
   # A RUSTFLAGS env var REPLACES `target.*.rustflags` from .cargo/config.toml
   # rather than merging with it, so the x86-64-v3 baseline has to be repeated
   # here or the Linux jobs would silently stop exercising the static AVX2
-  # dispatch path. Keep these two in sync with .cargo/config.toml.
-  RUSTFLAGS: -C target-cpu=x86-64-v3 -D warnings
+  # dispatch path. Keep this in sync with .cargo/config.toml.
+  #
+  # `-D warnings` is deliberately NOT set here: it would also apply to the
+  # clippy step and promote every style lint to an error. It is set per-step
+  # on the build and test steps, which is where rustc warnings matter.
+  RUSTFLAGS: -C target-cpu=x86-64-v3
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -44,9 +48,13 @@ jobs:
 
       - name: Build (default features)
         run: cargo build --all-targets
+        env:
+          RUSTFLAGS: -C target-cpu=x86-64-v3 -D warnings
 
       - name: Build (library only, no default features)
         run: cargo build --no-default-features
+        env:
+          RUSTFLAGS: -C target-cpu=x86-64-v3 -D warnings
 
       - name: Test
         run: cargo test --all-targets
@@ -65,9 +73,9 @@ jobs:
     if: github.event_name == 'push'
     runs-on: macos-14
     timeout-minutes: 30
-    # NEON is baseline on Apple silicon, so no target-cpu override is needed
-    # here — but the job-level value still has to be set, because the
-    # workflow-level x86-64-v3 flag would not apply to an aarch64 target.
+    # Override the workflow-level RUSTFLAGS: `-C target-cpu=x86-64-v3` is
+    # meaningless on aarch64. NEON and dotprod are baseline on Apple silicon,
+    # so nothing needs to replace it.
     env:
       RUSTFLAGS: -D warnings
     steps:
