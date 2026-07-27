@@ -101,6 +101,11 @@ previous-footer pointer and no replay log: the anchor is re-derived from
 the file itself. Decoy `VLTC` bytes inside payload data fail the
 double-checksum test and are skipped.
 
+This protocol is attacked directly by two harnesses that ship in the
+repository — seeded fault injection across ten damage classes, and real
+power cuts to a QEMU guest on ext4/XFS/btrfs. See
+[bench/CRASH_CAMPAIGN.md](../bench/CRASH_CAMPAIGN.md) to run them.
+
 ## What v2.4 Ships
 
 Storage and lifecycle:

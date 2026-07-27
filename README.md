@@ -236,6 +236,12 @@ and a trusted length field that drove a 2⁵⁴-byte allocation. All fixed, all
 now regression-tested. We'd rather tell you that than claim we wrote it
 perfectly the first time.
 
+Both harnesses ship in this repository and the campaign is seeded, so it
+replays bit-for-bit: **[bench/CRASH_CAMPAIGN.md](bench/CRASH_CAMPAIGN.md)** has
+the exact invocations, the ten fault classes, and how to read the outcomes.
+All 122,200 injections run in **under two minutes** and need no data files —
+you can check the claim above before you finish reading this page.
+
 ---
 
 ## The trade, stated plainly

@@ -287,7 +287,7 @@ fn snapshot_geometry(image: &[u8], visible_frames: usize) -> Result<GenInfo> {
     );
     ensure!(
         &image[footer_offset as usize..footer_offset as usize + 4] == TOC_MAGIC,
-        "header.footer_offset must point at the NXTC magic"
+        "header.footer_offset must point at the VLTC magic"
     );
     let body_len = le_u64(image, (footer_offset + TOC_BODY_LEN_AT) as usize);
     let footer_len = TOC_HEADER_LEN + body_len;
@@ -1557,7 +1557,7 @@ fn run_scale_sweep(work_dir: &Path, seed: u64) -> Result<Vec<ScalePoint>> {
 
         // Tear the final footer (zeroed, header still points at it) and
         // measure the scan-back open, which must recover the bulk
-        // generation by streaming the file for NXTC candidates.
+        // generation by streaming the file for VLTC candidates.
         let mut bytes = fs::read(&path)?;
         let footer_offset = le_u64(&bytes, HEADER_FOOTER_OFFSET_AT);
         let body_len = le_u64(&bytes, (footer_offset + TOC_BODY_LEN_AT) as usize);

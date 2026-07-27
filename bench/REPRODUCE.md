@@ -1,5 +1,8 @@
 # Reproducing the Valise end-to-end benchmark
 
+> Looking for the durability claims instead? Crash consistency has its own
+> harnesses and its own document: **[CRASH_CAMPAIGN.md](CRASH_CAMPAIGN.md)**.
+
 One Rust binary — `valise-e2e-bench` — builds two `.vls` files from real
 corpora, measures every lifecycle phase, then runs the same workloads
 through three peer engines in the same process for head-to-head

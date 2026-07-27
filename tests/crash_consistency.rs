@@ -6,7 +6,7 @@
 //!
 //! The commit path (`ValiseFile::commit_phase_writes`, src/file/commit.rs)
 //! appends payload + catalog segments at EOF, appends a self-validating
-//! TOC footer (magic `NXTC`, embedded body + footer BLAKE3, see
+//! TOC footer (magic `VLTC`, embedded body + footer BLAKE3, see
 //! src/format/toc.rs), rewrites the logical header prefix (bytes
 //! 0..120, `footer_offset` at bytes 32..40), then issues ONE
 //! `F_FULLFSYNC`.
@@ -17,7 +17,7 @@
 //! footer's own generation. If any of that fails — torn/absent footer,
 //! bad checksum, offset past EOF, unloadable roots, or a
 //! generation-mismatched (torn) header — open falls back to SCAN-BACK
-//! RECOVERY: it streams the file for `NXTC` footer candidates, fully
+//! RECOVERY: it streams the file for `VLTC` footer candidates, fully
 //! re-validates each (double BLAKE3, create-contract anchor, and a
 //! complete snapshot-root load), and re-anchors on the
 //! highest-generation valid snapshot. The previous commit's footer is
@@ -235,7 +235,7 @@ fn build_fixture() -> Fixture {
     assert_eq!(
         &pristine[footer_offset as usize..footer_offset as usize + 4],
         TOC_MAGIC,
-        "header.footer_offset must point at the NXTC magic"
+        "header.footer_offset must point at the VLTC magic"
     );
     let body_len = le_u64(&pristine, (footer_offset + TOC_BODY_LEN_AT) as usize);
     let footer_len = TOC_HEADER_LEN + body_len;
@@ -250,7 +250,7 @@ fn build_fixture() -> Fixture {
         payload_b1_offset >= gen1_bytes.len() as u64,
         "frame B1 payload bytes must live in the gen2 append region"
     );
-    // The payload segment's header is the closest NXSG magic at or
+    // The payload segment's header is the closest VLSG magic at or
     // before the payload bytes. Verify its type field so a fault aimed
     // at the segment header cannot silently target the wrong structure.
     let payload_seg_b_header = pristine[..payload_b1_offset as usize]
@@ -874,7 +874,7 @@ fn forged_footer_bytes() -> Vec<u8> {
     forged
 }
 
-/// Case 12: `NXTC` decoy bytes — one forged footer embedded in a
+/// Case 12: `VLTC` decoy bytes — one forged footer embedded in a
 /// COMMITTED gen1 payload, and one planted directly over the torn gen2
 /// footer region — must be skipped by the scan (their checksums cannot
 /// validate) without aborting it, and the real gen1 snapshot behind
