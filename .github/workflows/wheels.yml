@@ -45,8 +45,8 @@ jobs:
             target: aarch64
           - os: macos-14
             target: x86_64
-          - os: windows-latest
-            target: x64
+        # No Windows: the crate is Unix-only at 0.1 (positional IO + fcntl
+        # OFD locks). See the platform-support note in the README.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

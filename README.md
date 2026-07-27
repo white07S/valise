@@ -177,6 +177,11 @@ Pre-1.0 and under active development.
   across processes through an in-header region with mmap snapshots.
 - **Stability** — while the version is below 1.0, minor versions may break
   both the API and the on-disk format.
+- **Platforms** — Linux and macOS, on x86-64 and aarch64. **Windows is not
+  supported yet**: the commit protocol uses positional file IO and fcntl
+  OFD advisory locks, and the Windows equivalents are not implemented.
+  Building on Windows fails with an explicit message rather than a wall of
+  type errors.
 
 ## Documentation
 

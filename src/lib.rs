@@ -20,6 +20,17 @@
 //!   extending the format or embedding Valise in another storage system,
 //!   not when writing applications.
 
+// Fail with something a human can act on rather than a dozen "cannot find
+// `unix` in `os`" errors from deep inside the IO layer.
+#[cfg(not(unix))]
+compile_error!(
+    "valise supports Unix platforms only (Linux, macOS, BSD) as of 0.1.\n\
+     The commit protocol relies on positional file IO (`FileExt::write_at`) \
+     and fcntl OFD advisory locks. The Windows equivalents (`seek_write`, \
+     `LockFileEx`) are not implemented yet — see the platform-support note \
+     in the README."
+);
+
 /// Opt-in profiling output for the `VALISE_*_PROFILE` env vars.
 ///
 /// Writes straight to stderr on purpose: these are developer diagnostics
