@@ -72,6 +72,14 @@ impl PyReader {
             .map(|s| PyStored::from_stored(py, s)))
     }
 
+    /// Every committed key in a collection, in unspecified order. Mirrors
+    /// `valise::db::Reader::keys`. The engine work runs with the GIL
+    /// released — the returned keys are converted back under it.
+    fn keys(&self, py: Python<'_>, coll: String) -> PyResultX<Vec<PyObject>> {
+        let ks = py.detach(|| self.inner.keys(&coll))?;
+        Ok(ks.iter().map(|k| key_to_py(py, k)).collect())
+    }
+
     fn get_many(
         &self,
         py: Python<'_>,

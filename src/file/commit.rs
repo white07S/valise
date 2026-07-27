@@ -73,15 +73,18 @@ impl ValiseFile {
     ///
     /// This function performs THREE logical writes in user-space order:
     ///
-    ///   1. New segments appended at EOF (vector data, catalog deltas,
-    ///      text indexes, ANN graphs).
+    ///   1. New segments appended at EOF (payloads, vector data,
+    ///      catalog deltas, text indexes).
     ///   2. New TOC footer appended at EOF — self-validating via the
     ///      embedded body and footer checksums (see
     ///      [`crate::format::toc::TocFooterCodec`]).
-    ///   3. Header rewrite at offset 0..4096 — `footer_offset`,
-    ///      `toc_checksum`, and `snapshot_generation` updated together.
-    ///      The aligned 8-byte `footer_offset` write is the atomic
-    ///      commit switch.
+    ///   3. Header rewrite of the 120-byte logical prefix —
+    ///      `footer_offset` and `snapshot_generation` updated together.
+    ///      The aligned 8-byte `footer_offset` store within that write
+    ///      is the atomic commit switch; the surrounding prefix can
+    ///      still tear, which is why `resolve_footer_state` cross-checks
+    ///      the header generation against the footer's and falls back to
+    ///      a scan when they disagree.
     ///
     /// All three writes go to the OS page cache under
     /// `Durability::Buffered` (no per-step fsync). Durability comes

@@ -39,6 +39,8 @@ A third strategy treats recency as one more RRF channel (newest-first,
 contributing `weight/(k + rank + 1)`; requires RRF fusion):
 
 ```python
+from valise import Rrf, RrfChannel, Search
+
 hits = store.search("notes", Search()
     .text("body", "release notes")
     .recency(RrfChannel(half_life_days=14, weight=0.5))

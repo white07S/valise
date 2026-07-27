@@ -350,7 +350,7 @@ pub enum CodecFamily {
     /// Unrestricted polar quantization (v2.4): one joint cell index
     /// per complex pair over `M` amplitude rings with power-of-two
     /// per-ring phase counts. Params blob: `format::upq_params`
-    /// (`NXUP`). Appended at ordinal 2 — see the ordinal-stability
+    /// (`VLUP`). Appended at ordinal 2 — see the ordinal-stability
     /// note above.
     Upq,
 }

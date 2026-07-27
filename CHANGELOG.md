@@ -34,8 +34,8 @@ and hybrid search over it with no server and no sidecar index directory.
 - **Durability** — footer-rooted atomic commits with BLAKE3 segment
   checksums, fuzzed against torn writes. N readers and one writer,
   coordinated across processes through an in-header region.
-- **`valise` CLI** — `info`, `search`, `get`, `export`, each with
-  `--json`. `export` walks a whole capsule to JSON Lines without touching
+- **`valise` CLI** — `info`, `search`, `get` (each with `--json`) and
+  `export`, which streams a whole capsule to JSON Lines without touching
   the library.
 - **Python bindings** — typed facade over the same application concepts,
   checked by `mypy --strict` and a Rust/Python parity suite.

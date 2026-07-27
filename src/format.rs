@@ -48,7 +48,7 @@ pub const FORMAT_MAJOR: u16 = 2;
 /// shape changes that don't move segment boundaries.
 ///
 ///   - **0 (v2.0):** original v2 layout.
-///   - **1 (v2.2, current):** ANN profile burial. Dropped
+///   - **1 (v2.2):** ANN profile burial. Dropped
 ///     `TocFooterBody.ann_profile_catalog_root`,
 ///     `EmbeddingSpaceDesc.ann_profile_id`, and the `AnnProfile*`
 ///     descriptor types. Old v2.0/v2.1 files do not open under a v2.2

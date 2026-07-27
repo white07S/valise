@@ -38,8 +38,9 @@ The text scorer, fusion strategy, and rerank precision are **typed value
 objects / enums**. Passing a raw string raises `TypeError`.
 
 **Text scorers** (the `TextScorer` union — referenced inline here, not a public
-class): `Bm25(k1, b)`, `TfidfCosine(tf_mode)`, `CountCosine()`, `Dice()`,
-`Overlap()`, `Containment()`.
+class): `Bm25(k1, b)`, `TfidfCosine(tf_mode)`, `TfidfCosineApprox(tf_mode)`,
+`CountCosine()`, `CountCosineApprox()`, `Dice()`, `Overlap()`,
+`Containment()`.
 
 **Fusion** (the `Fusion` union): `Rrf(k)` for reciprocal-rank fusion, or
 `Weighted(text, vector)` for a linear weighted blend of the two channel kinds.

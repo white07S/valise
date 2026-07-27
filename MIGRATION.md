@@ -93,7 +93,7 @@ If you have the corpus and embeddings stored elsewhere (vector store, blob store
 
 ```rust
 let mut valise = ValiseFile::create_with_options(&new_path, CreateOptions::default())?;
-// re-register codecs, embedding spaces, ANN profiles, fusion profiles
+// re-register codecs, embedding spaces, fusion profiles
 // re-ingest frames, vectors, text
 valise.commit()?;
 ```
@@ -112,7 +112,8 @@ Valise does **not** ship this tool today. It would only be needed by a deploymen
 
 - Public types and method names (`ValiseFile`, `CreateOptions`, `PutFrame`, `PutVector`, etc.). The differences are in the deleted `wal_size` / `wal_mode` fields on `CreateOptions`, the deleted `wal_used_bytes()` / `wal_size()` accessors on `ValiseFile`, and the deleted `checkpoint_seq` field on `CommitOutcome`. Code that didn't touch those compiles unchanged.
 - TOC footer body shape (catalog references, segment registry roots).
-- Segment formats (vector data, ANN, vote-index, text indexes).
+- Segment formats (vector data, text indexes). The ANN and vote-index
+  segment types were removed in v2.2 and v2.3 respectively.
 - Codec parameter encoding.
 - Coord region layout (cross-process arbitration).
 - Create-time contract digest at byte 832.

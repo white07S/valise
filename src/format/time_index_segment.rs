@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! `TimeIndexSegment` payload codec, spec §17 (magic `NXTI`).
+//! `TimeIndexSegment` payload codec, spec §17 (magic `VLTI`).
 //!
 //! Naming: `_segment` (not `_codec`) because this file owns the
 //! `TimeIndexSegment` payload *type* plus its wire codec. The per-entry
@@ -178,7 +178,7 @@ pub(crate) fn decode_time_index_segment(bytes: &[u8]) -> Result<TimeIndexSegment
     let magic = cur.read_array::<4>()?;
     if magic != MAGIC {
         return Err(Error::Format(format!(
-            "TimeIndexSegment magic mismatch: expected NXTI, got {magic:?}"
+            "TimeIndexSegment magic mismatch: expected VLTI, got {magic:?}"
         )));
     }
     let version = cur.read_u16()?;

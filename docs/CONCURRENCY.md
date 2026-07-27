@@ -9,12 +9,58 @@ Status: **Final config landed.** Concurrency rollout complete through Stage 5++ 
 
 Stage 6 (per-collection writer sharding) deferred per plan — bench shows the next ceiling is the F_FULLFSYNC hardware barrier itself, not slot contention. Per-`WriteConnection` mutation buffers are the next milestone if we want to push past ~280 commits/s; that's a deeper refactor than the current scope.
 
-This is the running source of truth for implementation-level decisions backing
-[`CONCURRENCY_PLAN.md`](CONCURRENCY_PLAN.md). The plan describes the design;
-this doc records the bound decisions and evolves as we ship.
+This is the running source of truth for implementation-level decisions in the
+concurrency layer: the bound decisions and why they were made. The design plan
+it was originally written against is not part of this repository.
 
-When this doc and the plan disagree, **this doc wins** until the plan is
+When this doc and the code disagree, **the code wins** until this doc is
 amended.
+
+---
+
+## Current contract
+
+What the code does today. The change log further down records how it got
+here and is **historical** — where it disagrees with this section or with
+the source, it is out of date, not authoritative.
+
+**Readers.** `Database::reader()` is cheap and unlimited. A `ReadConnection`
+pins an `Arc<Snapshot>` at acquisition, and the pin covers:
+
+- catalog reads — `collections`, `frames`, `frame_stubs`, `vectors`,
+  `embedding_spaces`, `codecs`, `text_spaces`, `analyzers`, `field_schemas`,
+  `retrieval_profiles`, `fusion_profiles`. Lock-free, stable for the
+  connection's lifetime.
+- payload reads — `frame_full`, `read_payload`, `read_raw_text`. Lock-free.
+
+It does **not** cover the search path: `query_text`, `query_hybrid`,
+`vector_search`, `time_range_query`, `read_vector`, and the
+`collection_member_*` accessors take the `RwLock` read guard and observe the
+latest committed state. `Snapshot` pins the mmap and the catalog, not the
+lexical and vector indexes, so a query issued after a concurrent commit can
+return a frame the same connection's `frame_stubs()` does not list. Call
+`refresh_snapshot()` when the two must agree.
+
+**Writers.** At most one `WriteConnection` per `Database`. It holds
+`Database::writer_slot` — a non-reentrant `parking_lot::Mutex` — for its whole
+lifetime. `Database::writer()` **blocks** for the slot; `Database::try_writer()`
+returns `None` instead of waiting. Dropping the connection releases it.
+
+That exclusion is load-bearing, not bookkeeping: without it two writers'
+`put_frame` calls interleave over the shared payload staging buffer and the
+per-frame offset index that `commit` rewrites at flush, and two frames end up
+pointing at the same bytes. `tests/writer_pipeline.rs` covers it.
+
+**Writers do not block readers.** Write methods take the inner `RwLock` write
+guard per call and release it; the writer slot is a separate lock precisely so
+a long-lived writer does not stall reads.
+
+**Commit** is a three-phase avalanche: phase A writes segments, footer, and
+header under the write guard; the guard is dropped; phase B enters the
+`GroupFsync` barrier where concurrent committers coalesce onto one
+`F_FULLFSYNC`; then the publish phase re-takes the lock. Commits that find
+nothing dirty return `changed: false` carrying the generation the publishing
+commit produced.
 
 ---
 
@@ -43,12 +89,12 @@ it.
 
 | # | Decision | Bound value | Source |
 |---|---|---|---|
-| D1 | Lock-free map crate | **`papaya = "0.2"`** | plan §4.1 |
-| D2 | Reader slot count | **8** in v0.2 | plan §5.1 Option A |
-| D3 | Group-commit gather window | **0 µs default**, knob via `CreateOptions::commit_gather_window: Duration` | plan §4.5 |
+| D1 | Lock-free map crate | **Not adopted.** `papaya` was evaluated and dropped; the read path uses `ArcSwap` + per-snapshot `OnceLock` instead, so no concurrent map is needed. | — |
+| D2 | Reader slot count | **8** | plan §5.1 Option A |
+| D3 | Group-commit gather window | **Superseded.** The Stage 5 gather-window knob was removed with the leader/followers protocol; the Stage 5++ avalanche enters `GroupFsync` directly and there is no configurable window. | — |
 | D4 | `vector_base_ptrs` migration | **Per-snapshot `OnceLock<Arc<VectorBasePtrs>>`** that co-owns `Arc<Mmap>` | plan §4.2 |
 | D5 | Snapshot mmap pinning | **Snapshot pins its own `Arc<Mmap>`** (does not load `Database::current_mmap` per read) | diverges from plan §4.2 — see "D5 trade-off" below |
-| D6 | `ValiseFile` rename | **Façade over `Arc<Database>` + auto-acquired `WriteConnection`**; deprecated in 0.2, removed in 0.3 | plan §6 |
+| D6 | `ValiseFile` rename | **Not deprecated.** `ValiseFile` is the documented engine-level API and is staying; see the API-levels table in the README. | plan §6 |
 | D7 | Public read API | **Methods on `Database` + façade with `&self`**; `ReadConnection` for long pins | plan §6 |
 | D8 | Coord magic / version / feature bit | `coord_magic = b"VLSCOORD"`, `coord_version = 1`, `FEATURE_COORDINATION_REGION = 0x0040` | plan §5.1, §5.5 |
 | D9 | OFD lock byte mapping | Slot-relative: lock byte = slot's first byte within the coord region | plan §5.2 |
@@ -83,11 +129,17 @@ To save re-derivation when Stage 3 begins. Bound by D8/D9 and the
 | 120..128 | 8 | reserved (alignment pad) |
 | 128..192 | 64 | `CoordinationHeader` (magic, version, slot count, published atomics) |
 | 192..256 | 64 | `WriterSlot` (1 lock byte + padding) |
-| 256..320 | 64 | `CheckpointerSlot` (reserved, unused in v0.2) |
+| 256..320 | 64 | `CheckpointerSlot` (reserved, currently unused) |
 | 320..832 | 64×8 | `ReaderSlot[8]` |
 
-Total: **832 bytes** within the existing 4 KB header reserved area
-(`120..4096`). Header size unchanged.
+The region spans file offsets `128..832`, so `COORD_REGION_SIZE` is **704
+bytes** (832 is the end offset, not the size). The 8-byte pad at `120..128`
+is alignment and sits outside the region. All of it fits in the header's
+existing reserved area (`120..4096`); header size is unchanged.
+
+Note the slot offset constants in `src/format.rs` are **region-relative**
+(`COORD_WRITER_SLOT_OFFSET = 64` means file offset 192), which is why they
+look 128 lower than this table.
 
 `CoordinationHeader` starts at byte 128 (cache-line aligned). The 8-byte
 `coord_magic` `b"VLSCOORD"` overlaps the first 8 bytes of the aligned region;
@@ -110,7 +162,7 @@ src/concurrency/
 ```
 
 Visibility: `pub(crate)` everywhere until Stage 4 promotes `Database` and
-`Connection` to `pub`. SKILL.md: "Promote visibility on demand."
+`Connection` to `pub` — visibility promoted on demand rather than up front.
 
 ---
 
@@ -133,8 +185,8 @@ Visibility: `pub(crate)` everywhere until Stage 4 promotes `Database` and
 ## Audit (Stage 0): `&mut self` classification
 
 Confirmed via codebase audit (Stage 0 sub-agent): the six methods called out
-in [`CONCURRENCY_PLAN.md`] §2.2 are exactly the "logically read" set —
-`frame_full`, `read_payload`, `read_raw_text`, `read_vector`, `ann_search`,
+in the original design plan were exactly the "logically read" set —
+`frame_full`, `read_payload`, `read_raw_text`, `read_vector`, `vector_search`,
 `query_hybrid`. No additional `&mut self` reads were missed. Eight test/bench
 call sites under `tests/` and `bench/` hold `let mut valise` for read-only files;
 those will be cleaned up in the same PR that flips signatures.
@@ -143,10 +195,18 @@ those will be cleaned up in the same PR that flips signatures.
 
 ## Change log
 
+**Historical.** These entries record what each stage changed at the time it
+landed, including intermediate designs that were later replaced — the Stage 5
+leader/followers `pipeline.submit` protocol and its gather-window knob, the
+per-call-locked `ReadConnection` reads, and the `RwLockWriteGuard`-based
+`WriteConnection`. None of those describe the current code. For that, read
+"Current contract" at the top, then the source. Test names quoted below are
+as they were when written and several no longer exist.
+
 - **2026-05-03** — Stage 0 lands. D1–D10 bound. Coord region layout pinned at
-  832 bytes (Option A from plan §5.1).
+  704 bytes (Option A from plan §5.1).
 - **2026-05-03** — Stage 1 lands. `frame_full`, `read_payload`,
-  `read_raw_text`, `read_vector`, `ann_search`, `query_hybrid` are all
+  `read_raw_text`, `read_vector`, `vector_search`, `query_hybrid` are all
   `&self`. Internal restructure:
   - `file: File` → `file: parking_lot::Mutex<File>` (uncontended on writers
     via `lock()`; reader path locks briefly per-syscall).
@@ -198,7 +258,7 @@ those will be cleaned up in the same PR that flips signatures.
 - **2026-05-04** — Stage 3a lands. Coordination region carved into the
   existing 4 KB header per spec §7.1; `format_minor` bumped from 1 to 2.
   - **Layout (704 bytes, file offsets 128..832)**: 64 B
-    `CoordinationHeader` (magic `VALISECOORD`, version `1`, slot count `8`,
+    `CoordinationHeader` (magic `VLSCOORD`, version `1`, slot count `8`,
     two 8-byte atomic `u64`s for `published_toc_offset` /
     `published_snapshot_generation`, padding); 64 B `WriterSlot`; 64 B
     `CheckpointerSlot` (reserved); 64 B × 8 `ReaderSlot` (each: pinned
@@ -345,7 +405,7 @@ those will be cleaned up in the same PR that flips signatures.
     construction. `snapshot()` accessor returns `&Arc<Snapshot>`;
     `refresh_snapshot(&mut self)` re-pins to the latest published
     snapshot. Delegated read methods (`read_payload`, `read_vector`,
-    `ann_search`, `query_text`, `query_hybrid`, `frame_full`,
+    `vector_search`, `query_text`, `query_hybrid`, `frame_full`,
     `time_range_query`, …) — each takes the underlying `RwLock` read
     guard briefly per call. Stage 5 will rewire to drive directly off
     the pinned `Arc<Snapshot>` (the no-lock read path).
@@ -389,7 +449,7 @@ those will be cleaned up in the same PR that flips signatures.
       thread blocks while first is alive, proceeds when first drops.
     - `database_clone_and_concurrent_readers` — 4 reader threads on
       `Arc::clone(&db)` execute `read_payload` concurrently.
-    - `read_connection_through_database_runs_ann_search` — full
+    - `read_connection_through_database_runs_vector_search` — full
       ANN query via `ReadConnection`.
 - **2026-05-04** — Stage 5 scaffolding lands. `WriterPipeline` +
   exclusion-lock split.

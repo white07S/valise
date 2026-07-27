@@ -104,8 +104,9 @@ $ valise search kb.vls notes "vector quantization" --top-k 3
 $ valise export kb.vls > kb.jsonl        # every record, as JSON Lines
 ```
 
-`info`, `search`, `get`, and `export` all take `--json`. Your data is never
-locked in: `export` walks the whole capsule with no library code.
+`info`, `search`, and `get` take `--json`; `export` always emits JSON Lines.
+Your data is never locked in — `export` walks a whole capsule without
+touching the library.
 
 ## Why Valise
 

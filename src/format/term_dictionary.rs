@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! `TermDictionarySegment` payload codec, spec §12.1 (magic `NXTD`).
+//! `TermDictionarySegment` payload codec, spec §12.1 (magic `VLTD`).
 //!
 //! Each delta segment carries only newly-introduced `term_id` records for one
 //! `text_space_id`; running `df` / `cf` are recomputed by walking the chain
@@ -58,7 +58,7 @@ pub(crate) fn decode_term_dictionary_segment(bytes: &[u8]) -> Result<TermDiction
     let magic = cur.read_array::<4>()?;
     if magic != MAGIC {
         return Err(Error::Format(format!(
-            "TermDictionarySegment magic mismatch: expected NXTD, got {magic:?}"
+            "TermDictionarySegment magic mismatch: expected VLTD, got {magic:?}"
         )));
     }
     let version = cur.read_u16()?;

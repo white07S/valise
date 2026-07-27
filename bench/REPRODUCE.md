@@ -26,12 +26,33 @@ For head-to-head quality + CPU/memory against **Python** engines
 (FAISS, LanceDB, hnswlib · bm25s, pyserini, rank_bm25) on the *same*
 datasets and ground truth, see **§8 (`bench/python/`)**.
 
+## 0. Get the data
+
+The corpora are large and regenerable, so they are not in the repository.
+Fetch and convert them with:
+
+```bash
+python3 bench/prep_data.py --list        # what's available, and how big
+python3 bench/prep_data.py all-small     # scifact + sift-1m, ~504 MB
+```
+
+`scifact` needs nothing but the standard library. The vector datasets
+ship as HDF5, so they need `h5py` and `numpy` (`pip install h5py numpy`).
+Downloads resume-safely — a partial transfer is never mistaken for a
+finished one — and anything already present is skipped unless you pass
+`--force`.
+
+Two datasets cannot be fetched automatically: `cohere-medium-1m-f32` is
+behind HuggingFace's gated-terms flow, and `openai-medium-500k` is not
+redistributable. `prep_data.py --list` explains how to build each by hand,
+and `--layout` prints the exact on-disk format expected.
+
 ## 1. Prerequisites
 
 - macOS aarch64 (M-series) or Linux x86_64 with the stable Rust
   toolchain pinned in `rust-toolchain.toml`.
 - **BEIR scifact** (5 183 docs, 300 evaluated queries) at
-  `bench/beir-data/scifact/`:
+  `bench/beir-data/scifact/` — `prep_data.py scifact` puts it there:
   ```
   bench/beir-data/scifact/
     corpus.jsonl
@@ -73,14 +94,34 @@ cargo build --release -p valise-bench --bin valise-e2e-bench
 ```bash
 target/release/valise-e2e-bench \
     --beir-dir bench/beir-data/scifact \
-    --vector-dir bench/datasets/cohere-medium-1m-f32 \
+    --vector-dir bench/datasets/sift-1m \
     --vector-n 100000 \
     --out bench/results/e2e.json
 ```
 
-The full run takes ~30 s on an Apple M-series and writes
-`bench/results/e2e.json`. No persistent `.vls` artefacts remain on
-disk afterward.
+That is the fully reproducible configuration — both datasets come from
+`prep_data.py all-small`. Swap `--vector-dir` for
+`bench/datasets/cohere-medium-1m-f32` to match the d=768 reference numbers
+in §6, which is the corpus most of this document was measured on.
+
+The run takes a couple of minutes on an Apple M-series and writes
+`bench/results/e2e.json`. No persistent `.vls` artefacts remain on disk
+afterward.
+
+**Sanity check.** On an M-series laptop the command above should land near:
+
+| Metric | Valise | Peer |
+|---|---|---|
+| text storage | 5.8 MiB | Tantivy 7.9 MiB |
+| text p50 | ~129 µs | Tantivy ~192 µs |
+| vector recall@10 | 0.933 | usearch 0.991, hnsw_rs 0.979 |
+| vector storage | 16.1 MiB | usearch 38.6 MiB |
+| concurrent text scaling | ~8.7x at 8 threads | — |
+
+Vector p50 (~812 µs) is slower than the HNSW peers by design: there is no
+persisted graph, so the sketch scan is linear in the corpus. The trade is
+storage and the absence of an index build. Treat these as order-of-magnitude
+guides — absolute numbers move with hardware, dimension, and distribution.
 
 ## 4. CLI knobs
 
@@ -261,7 +302,7 @@ AVX-VNNI, no AVX-512), Debian 13. Built with the project default
 statically enables AVX2 + FMA + POPCNT + BMI2 — the dispatchers
 collapse to direct AVX2 kernel calls at compile time. Numbers below
 are from the Phase-6 close-out of the AVX2 SIMD rollout
-(`docs/X86_64_SIMD_PLAN.md`).
+(see `docs/VECTOR_SEARCH.md` for the kernel design).
 
 | Subject     | ingest s | commit s | storage MiB | B/vec | p50 µs | p95 µs | cores | peak RSS |
 |-------------|---------:|---------:|------------:|------:|-------:|-------:|------:|---------:|

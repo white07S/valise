@@ -27,6 +27,16 @@ class Reader:
         ns = self._n.get(coll, key)
         return None if ns is None else Stored._from_native(ns)
 
+    def keys(self, coll: str) -> list[Key]:
+        """Every committed key in ``coll``, in unspecified order.
+
+        The building block for a full scan: pair it with :meth:`get_many` to
+        walk a capsule end to end. Uncommitted records are excluded. Cost is
+        O(records in ``coll``) and the result holds one key per record, so
+        chunk it for very large collections.
+        """
+        return self._n.keys(coll)
+
     def get_many(self, coll: str, keys: list[Key]) -> list[Optional[Stored]]:
         """Fetch many records in one native call.
 

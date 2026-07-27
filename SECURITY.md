@@ -8,8 +8,7 @@ Until 1.0, the format and API may change between minor versions; see
 
 | Version | Supported |
 | ------- | --------- |
-| 0.2.x   | Yes       |
-| < 0.2   | No        |
+| 0.1.x   | Yes       |
 
 ## Reporting a vulnerability
 

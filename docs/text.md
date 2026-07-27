@@ -207,7 +207,7 @@ TermDictionaryEntry
 
 ### 8.1 Layout
 
-A `TermDictionarySegment` is a delta segment: it carries only newly-assigned `term_id`s relative to the prior segment in the chain (Valise §19.2). Each segment payload uses the standard catalog envelope (`magic = VALISEC`, table `TermDictionary`).
+A `TermDictionarySegment` is a delta segment: it carries only newly-assigned `term_id`s relative to the prior segment in the chain (Valise §19.2). Each segment payload uses the standard catalog envelope (`magic = VLCC`, table `TermDictionary`).
 
 Within a segment, entries are sorted ascending by `term_id`. Term bytes are stored as length-prefixed bytes, followed by varint `collection_freq` and `doc_freq`.
 
@@ -541,7 +541,7 @@ The in-memory builder is lost if the process crashes before `commit()`. On reope
 - The analyzer is deterministic.
 - Re-running `index_frame_text` over the same payload produces identical token streams.
 
-Implementations that prefer to persist the buffer across crashes may add an `IndexFrameText` WAL op; this is a v2 amendment to Valise §8.2.
+There is no WAL in the v2 format — `commit()` is the only durability point, so an uncommitted text buffer is lost on crash by design.
 
 ## 15. Calibration
 

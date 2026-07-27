@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! Columnar `FrameCatalog` segment codec, spec §10 v2 (magic `NXF2`).
+//! Columnar `FrameCatalog` segment codec, spec §10 v2 (magic `VLF2`).
 //!
 //! Naming: this is a `_codec` file (pure encode/decode) because the row
 //! type it serializes — `FrameDesc` — lives in `format/catalog.rs`
@@ -17,7 +17,7 @@
 //!
 //! Wire format:
 //!
-//!   MAGIC "NXF2"                        (4)
+//!   MAGIC "VLF2"                        (4)
 //!   VERSION u16 = 2                     (2)
 //!   FRAME_COUNT u32                      (4)
 //!   PREVIOUS_ROOT_PRESENCE u8            (1)
@@ -225,7 +225,7 @@ pub(crate) fn decode_frame_catalog_previous_root(bytes: &[u8]) -> Result<Option<
     let magic = cur.read_array::<4>()?;
     if magic != MAGIC {
         return Err(Error::Format(format!(
-            "FrameCatalog magic mismatch: expected NXF2, got {magic:?}"
+            "FrameCatalog magic mismatch: expected VLF2, got {magic:?}"
         )));
     }
     let version = cur.read_u16()?;
@@ -243,7 +243,7 @@ fn decode_frame_catalog_full(bytes: &[u8], _trace: bool) -> Result<(FrameCatalog
     let magic = cur.read_array::<4>()?;
     if magic != MAGIC {
         return Err(Error::Format(format!(
-            "FrameCatalog magic mismatch: expected NXF2, got {magic:?}"
+            "FrameCatalog magic mismatch: expected VLF2, got {magic:?}"
         )));
     }
     let version = cur.read_u16()?;

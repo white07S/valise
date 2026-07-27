@@ -311,7 +311,7 @@ struct OpenState {
 /// Recovery path (scan-back): when the referenced footer is missing,
 /// torn, checksum-invalid, past EOF, generation-inconsistent with the
 /// header (torn header rewrite), or any of its snapshot roots fail to
-/// load, scan the whole file for candidate `NXTC` footers and recover
+/// load, scan the whole file for candidate `VLTC` footers and recover
 /// the highest-generation fully-valid snapshot. The previous commit's
 /// footer is guaranteed durable — that commit's own fsync barrier
 /// covered it — so any file that ever committed successfully has at

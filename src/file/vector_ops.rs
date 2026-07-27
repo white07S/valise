@@ -436,7 +436,7 @@ impl ValiseFile {
 
     /// Read the raw text of a frame as UTF-8, spec §12 (raw text). v1 stores
     /// raw text directly in the frame's `PayloadSegment` (§11) — separate
-    /// `NXRT` / `NXRD` segments are reserved for v2 (deduplicated /
+    /// `VLRT` / `VLRD` segments are reserved for v2 (deduplicated /
     /// dictionary-compressed text). Returns an error if the bytes are not
     /// valid UTF-8.
     pub fn read_raw_text(&self, frame_id: FrameId) -> Result<String> {

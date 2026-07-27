@@ -3,9 +3,8 @@
 The application surface (`valise::prelude` ↔ `import valise`) is mirrored
 1:1: same nouns, same defaults, same capabilities. Defaults live in **Rust
 only** — Python passes `None`/sentinels and the native layer applies them.
-Contract: `docs/SIMPLE_API_SPEC.md`. Rows whose Python side is marked
-Both columns are implemented in the Rust/PyO3 binding and exercised by the
-local parity suite. Published wheel availability is a release-process concern,
+Contract: `docs/SIMPLE_API_SPEC.md`. Both columns are implemented in the
+Rust/PyO3 binding and exercised by the local parity suite. Published wheel availability is a release-process concern,
 not a difference in the surface contract.
 
 ## Store lifecycle
@@ -47,6 +46,9 @@ not a difference in the surface contract.
 | Key | `Key::{Str, U64, Bytes}` — `impl Into<Key>` everywhere | `str \| int \| bytes` | Booleans / negative ints rejected in Python. |
 | Record | `Record::new().text(f, &str).vector(f, &[f32]).at(unix_secs).child_of(Key)` | `Record().text(f, str).vector(f, float32 ndarray).at(unix_secs).child_of(key)` | Vectors borrowed zero-copy across FFI. `created_at` must be non-decreasing in commit order. |
 | Read back | `Stored { key, collection, created_at, text, vectors }` | `Stored` dataclass, same fields | Vector round-trips are lossy (quantized) — never assert exact equality. |
+| Fetch one | `reader.get(coll, key)? -> Option<Stored>` | `reader.get(coll, key) -> Stored \| None` | |
+| Fetch many | `reader.get_many(coll, &[Key])? -> Vec<Option<Stored>>` | `reader.get_many(coll, keys) -> list[Stored \| None]` | One native call; result is aligned with the input. |
+| List keys | `reader.keys(coll)? -> Vec<Key>` | `reader.keys(coll) -> list[Key]` | Committed keys only, unspecified order. Pair with `get_many` to scan a collection. |
 
 ## Writing
 

@@ -195,7 +195,7 @@ impl ValiseFile {
     }
 
     /// Every committed `FrameDesc`, **including tombstoned ones**. The v2
-    /// columnar FrameCatalog (`NXF2`) decodes these eagerly at open, so
+    /// columnar FrameCatalog (`VLF2`) decodes these eagerly at open, so
     /// this is the complete set post-open (the v1 lazy/ghost-catalog path
     /// is gone — v1 files are no longer readable). For just the live set,
     /// use [`Self::active_frames`].

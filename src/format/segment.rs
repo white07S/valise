@@ -41,8 +41,14 @@ pub enum SegmentType {
     VectorData = 0x0020,
     CollectionFilter = 0x0022,
     CodecParams = 0x0023,
-    /// Phase 3: persisted vote-index CSR (`VVI1` magic). One per
-    /// `(embedding_space, qam_codec)` pair; pointed at by a
+    /// Chronological `(frame_id, collection_id, created_at, updated_at)`
+    /// index, columnar since v2.1. Backs `time_range_query`.
+    ///
+    /// Note the gaps either side: `0x000B` and `0x0021` were the
+    /// `VoteProfileCatalog` and `VectorVoteIndex` segments, removed in
+    /// v2.3 when vector search moved to the in-memory sign sketch. Those
+    /// discriminants stay burned so an old file's segments can never be
+    /// silently reinterpreted as something else.
     TimeIndex = 0x0030,
     SegmentRegistry = 0x00FE,
     Extension = 0x00FF,

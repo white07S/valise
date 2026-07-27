@@ -61,7 +61,7 @@ of f32.
 - **No persisted index.** No HNSW graph, no IVF lists, no CSR vote segment. The
   only search structure is the in-memory **sign sketch** (1 bit/dim), which is
   *derived for free* from the stored phase codes when the file is opened
-  (`build_vector_base_ptrs` in `src/file.rs`, `QamSlidingEngine::sign_sketch` in
+  (`build_vector_base_ptrs` in `src/file/vector_search.rs`, `QamSlidingEngine::sign_sketch` in
   `src/codec/qam_sliding.rs`). Nothing is written at commit beyond the codes.
 
 - **Selection is a dense, full-coverage scan.** Every active vector is compared
@@ -88,7 +88,8 @@ pool. Valise stores only the lossy codes — it keeps **no f32** — so the best
 search can ever do is rank by cosine on the *reconstruction*.
 
 Measured on real Cohere `text-embedding` d=768 (100k), recall@10 vs exact f32
-(`examples/sketch_debug.rs`, `examples/vector_768_bench.rs`):
+(measured with the exploratory harnesses that produced the sweep files
+in §7; those were not kept in the repository):
 
 | reference truth / rerank target                    | recall@10 |
 |----------------------------------------------------|-----------|
@@ -100,7 +101,7 @@ Measured on real Cohere `text-embedding` d=768 (100k), recall@10 vs exact f32
 Read this carefully, because it is the single most common source of confusion:
 
 - **Selection is not the bottleneck.** At ck≈2000 the sketch already covers
-  ~99.9% of the true top-10; at ck≈4000 it covers 100%. (`vector_768_bench.rs`
+  ~99.9% of the true top-10; at ck≈4000 it covers 100%. (the d=768 sweep
   stage decomposition; `bench/results/sweep/06_simhash_sketch.txt`.)
 - **"Coverage 1.0 but recall 0.965" is not a contradiction.** The dropped
   neighbors *are* in the candidate set, but they are borderline (#9/#10 true
@@ -129,7 +130,7 @@ passes `None`, the engine uses a **fixed, corpus-size-INDEPENDENT default**:
 channel_k = max(4 * k, DEFAULT_SKETCH_CANDIDATE_BUDGET)   // 2048, clamped to N
 ```
 
-(`DEFAULT_SKETCH_CANDIDATE_BUDGET` in `src/file.rs`.)
+(`DEFAULT_SKETCH_CANDIDATE_BUDGET` in `src/file/query_types.rs`.)
 
 ### Do not reintroduce the `N/4` rule
 
@@ -146,7 +147,7 @@ wrong and has been removed.** Two reasons:
    also score ~0.99 at ck=N/4. It measured coverage *volume*, not selection.
 
 The measured truth: selection coverage **saturates by ck≈2000–4000** at d=768
-(`06_simhash_sketch.txt`, `vector_768_bench.rs`). Everything past that is pure
+(`06_simhash_sketch.txt` in the §7 sweep set). Everything past that is pure
 rerank tax for zero recall — at 100k, ck=2000 and ck=25000 give the identical
 0.965. The fixed default sits at the knee.
 
@@ -255,11 +256,30 @@ only more codec bits (or stored f32) move the ceiling.**
 
 ## 8. Reproducing
 
-- Engine-level (latency / recall / storage / concurrent throughput, stage
-  decomposition): `cargo run --release --example vector_768_bench`
-- Codec-level (recall ceiling proof, magnitude-mask sketch, rerank-target
-  comparison): `cargo run --release --features bench --example sketch_debug`
-- Full end-to-end vs peers (Tantivy / USearch / hnsw_rs): see
-  `bench/REPRODUCE.md`.
+Everything below runs through the end-to-end bench. Get the data first:
 
-All require the Cohere d=768 corpus at `bench/datasets/cohere-medium-1m-f32/`.
+```bash
+python3 bench/prep_data.py --list        # options and sizes
+python3 bench/prep_data.py all-small     # scifact + sift-1m, ~504 MB
+```
+
+- Engine-level (latency / recall / storage / concurrent throughput, stage
+  decomposition):
+
+  ```bash
+  cargo build --release -p valise-bench --bin valise-e2e-bench
+  target/release/valise-e2e-bench \
+      --beir-dir bench/beir-data/scifact \
+      --vector-dir bench/datasets/sift-1m \
+      --vector-n 100000 --out bench/results/e2e.json
+  ```
+
+- Codec comparison: rerun with `--codec upq` and diff the reports.
+- Full end-to-end vs peers (Tantivy / USearch / hnsw_rs) is part of the same
+  binary; see `bench/REPRODUCE.md` for the knobs and the reference numbers.
+
+The numbers quoted in this document were measured on the Cohere d=768 corpus
+(`bench/datasets/cohere-medium-1m-f32/`), which is gated on HuggingFace and
+must be built by hand — `bench/prep_data.py --list` explains how. `sift-1m`
+is the substitute that reproduces without credentials; absolute figures will
+differ with dimension and distribution, the shape of the curves should not.

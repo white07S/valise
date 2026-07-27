@@ -4,7 +4,7 @@
 
 //! `QamLloydMaxParams` payload codec, spec §14.
 //!
-//! Magic `NXQL`, version 1. Hand-coded wire format — a Rust struct-field
+//! Magic `VLQL`, version 1. Hand-coded wire format — a Rust struct-field
 //! reorder must not silently break compatibility.
 //!
 //! ## What this codec is
@@ -28,7 +28,7 @@
 //!
 //! Wire layout (little-endian):
 //! ```text
-//! [magic NXQL                : 4 B            ]
+//! [magic VLQL                : 4 B            ]
 //! [version u16 = 1           : 2 B            ]
 //! [dimension u32             : 4 B            ]
 //! [num_pairs u32             : 4 B            ] (= dimension / 2)
@@ -122,7 +122,7 @@ pub(crate) fn decode_qam_lloyd_max_params(bytes: &[u8]) -> Result<QamLloydMaxPar
     let magic = cur.read_array::<4>()?;
     if magic != MAGIC {
         return Err(Error::Format(format!(
-            "QamLloydMaxParams magic mismatch: expected NXQL, got {magic:?}"
+            "QamLloydMaxParams magic mismatch: expected VLQL, got {magic:?}"
         )));
     }
     let version = cur.read_u16()?;

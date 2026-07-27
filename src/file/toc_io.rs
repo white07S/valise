@@ -51,11 +51,11 @@ pub(super) struct FooterCandidate {
 }
 
 /// Recovery-path scan: stream the file in bounded chunks hunting for the
-/// `NXTC` magic and return every offset whose bytes decode as a fully
+/// `VLTC` magic and return every offset whose bytes decode as a fully
 /// self-validating TOC footer (embedded body + footer BLAKE3, version and
 /// length bounds — see [`TocFooterCodec::decode`]).
 ///
-/// Decoy `NXTC` bytes inside payload data fail the double-checksum
+/// Decoy `VLTC` bytes inside payload data fail the double-checksum
 /// validation and are skipped without aborting the scan; forging a footer
 /// that passes both BLAKE3 digests is effectively impossible by accident.
 /// This runs only when the header-referenced footer is unusable or

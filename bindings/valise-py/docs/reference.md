@@ -37,7 +37,9 @@ from its docstrings and type hints by mkdocstrings.
 ::: valise.TfMode
 ::: valise.Bm25
 ::: valise.TfidfCosine
+::: valise.TfidfCosineApprox
 ::: valise.CountCosine
+::: valise.CountCosineApprox
 ::: valise.Dice
 ::: valise.Overlap
 ::: valise.Containment
@@ -45,6 +47,7 @@ from its docstrings and type hints by mkdocstrings.
 ::: valise.Weighted
 ::: valise.Range
 ::: valise.HalfLife
+::: valise.RrfChannel
 
 ## Partitions
 
@@ -58,8 +61,18 @@ from its docstrings and type hints by mkdocstrings.
 ::: valise.Stats
 ::: valise.CompactReport
 ::: valise.Durability
+::: valise.CollectionInfo
+::: valise.SpaceInfo
 
 ## Errors
 
+`ValiseError` is the base of the hierarchy; catching it catches everything
+this package raises.
+
+::: valise.ValiseError
 ::: valise.NotCalibratedError
 ::: valise.SchemaMismatchError
+::: valise.CorruptionError
+::: valise.BusyError
+::: valise.UnsupportedError
+::: valise.ValidationError

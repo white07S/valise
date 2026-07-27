@@ -36,9 +36,9 @@ achievable per-call cost.
    once, but 1M vectors × 300 ns is ~300 ms of pure copy. The bulk path borrows
    the 2-D buffer; only the single async query vector is copied.
 
-The authoritative budget and rationale live in `docs/BINDINGS_PLAN.md` §11 in
-the engine repository:
-<https://github.com/white07S/valise/blob/main/docs/BINDINGS_PLAN.md>.
+The budgets above are the contract. They are enforced by the benchmark in
+`bindings/valise-py/bench/`, with `examples/binding_overhead.rs` as the
+direct-Rust mirror that isolates FFI cost from engine cost.
 
 ## A note on docs as a single source of truth
 

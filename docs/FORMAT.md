@@ -19,11 +19,15 @@ time indexes, and recovery metadata into one `.vls` file.
 Until the full prose spec is rewritten, the operational contract lives in these
 files:
 
-- [`CONTRIBUTING.md`](../CONTRIBUTING.md) — architecture map, workflow rules,
-  and the commit/recovery protocol.
+- [`src/file/commit.rs`](../src/file/commit.rs) — the commit protocol, with
+  the crash-safety contract as a doc comment on `commit_phase_writes`.
+- [`src/file/lifecycle.rs`](../src/file/lifecycle.rs) — open and recovery,
+  including the scan-back path (`resolve_footer_state`).
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) — architecture map and workflow
+  rules.
 - [`src/format.rs`](../src/format.rs) — active `FORMAT_MAJOR` /
   `FORMAT_MINOR` constants and format-module root.
-- [`src/format/header.rs`](../src/format/header.rs) — fixed 4 KB header.
+- [`src/format/header.rs`](../src/format/header.rs) — fixed 4 KiB header.
 - [`src/format/toc.rs`](../src/format/toc.rs) — self-validating TOC footer.
 - [`src/format/segment.rs`](../src/format/segment.rs) — generic segment
   header and segment type registry.
@@ -35,6 +39,11 @@ files:
 
 If code and this page disagree, treat the code and golden tests as the active
 contract, then update this page in the same change.
+
+Note that source comments cite section numbers (`spec §12.2`, `§14.4`, and so
+on) from the full prose specification, which is not published yet. Those
+numbers have no anchor on this page — follow the file references above
+instead.
 
 ## File Shape
 
@@ -54,21 +63,39 @@ Valise does **not** use a WAL in the current v2 line.
 
 The v2 commit protocol is:
 
-1. Encode new segments and append them to EOF.
-2. Encode and append a TOC footer.
-3. Atomically rewrite the aligned 8-byte `header.footer_offset`.
-4. Flush according to the configured durability mode.
+1. Take the cross-process writer lock in the coordination region.
+2. Flush staged payloads and vector batches, then append the new segments
+   to EOF.
+3. Encode and append a TOC footer.
+4. Publish `(footer_offset, snapshot_generation)` to the coordination
+   region. This happens **before** the header write, so a reader that
+   observes the coordination region never sees an offset the file cannot
+   satisfy.
+5. Rewrite the header's 120-byte logical prefix, updating `footer_offset`
+   and `snapshot_generation`. The aligned 8-byte `footer_offset` store
+   within that write is the atomic commit switch.
+6. One `F_FULLFSYNC` for the whole commit. Per-step writes are forced to
+   buffered mode so four barriers collapse into one; the configured
+   durability mode governs writes *outside* commit, not within it.
 
-Recovery is:
+Recovery, on open:
 
-1. Read the header.
-2. Seek to `header.footer_offset`.
-3. Decode the TOC footer.
-4. Validate the embedded BLAKE3 body checksum and full-footer checksum.
-5. Rebuild the in-memory view from the catalog chains referenced by the TOC.
+1. Read the header, seek to `header.footer_offset`, decode the TOC footer.
+2. Validate the embedded BLAKE3 body checksum and full-footer checksum.
+3. Check the footer against the create-contract digest at header byte 832,
+   which anchors the footer to this file's lineage and rejects a footer
+   that belongs to a different file.
+4. Cross-check the header's `snapshot_generation` against the footer's. A
+   torn 120-byte header rewrite shows up here as a disagreement.
+5. Rebuild the in-memory view from the catalog chains the TOC references.
 
-If a crash leaves only a prefix of the new commit on disk, recovery falls back
-to the previously published footer offset. There is no replay step.
+**If any of that fails** — footer missing, torn, checksum-invalid, past
+EOF, generation-inconsistent, or one of its snapshot roots will not load —
+recovery scans the whole file for candidate `VLTC` footers and selects the
+highest-generation footer that validates completely. There is no stored
+previous-footer pointer and no replay log: the anchor is re-derived from
+the file itself. Decoy `VLTC` bytes inside payload data fail the
+double-checksum test and are skipped.
 
 ## What v2.4 Ships
 
@@ -116,13 +143,19 @@ Current vector search is **not** based on a persisted ANN graph, HNSW index, IVF
 index, CSR vote index, or sidecar file.
 
 At file open, Valise derives a dense sign-sketch from the persisted vector codec
-bytes. Query flow is:
+bytes. For a space that has one — QAM(5,6) configurations and UPQ — the query
+flow is:
 
 1. Pack the query into the codec's query representation.
 2. Run a sign-sketch Hamming scan over active vectors.
 3. Keep a bounded candidate set controlled by `channel_k`.
 4. Rerank candidates through the codec-specific path.
 5. Optionally run a full reconstruction rerank for the accurate path.
+
+A space with no sketch — any other codec configuration, or an empty space —
+falls back to a full brute-force scan through the primary codec. That is
+correct but linear in the corpus, so it is worth knowing which path a given
+space is on (`src/file/vector_search.rs`).
 
 See [`docs/VECTOR_SEARCH.md`](VECTOR_SEARCH.md) for the current benchmark
 envelope, limits, and experiment history.
@@ -139,15 +172,21 @@ use Dice/Overlap/Containment in that surface.
 
 ## Compatibility
 
-The format is still a private pre-v1 development line. The current
-implementation and golden-format tests are the compatibility target for this
-repository. Treat externally distributed files as rebuildable until a v1 format
-stability policy is declared.
+The format is pre-1.0. `tests/golden_format_v2.rs` pins a BLAKE3 hash of a
+deterministic fixture, so any change to the byte layout is caught and has to
+be deliberate — but below 1.0 a `FORMAT_MINOR` bump may reject older files at
+open rather than migrating them. Every such change is recorded in
+[MIGRATION.md](../MIGRATION.md).
+
+Treat capsules as rebuildable from source data until a 1.0 stability policy
+is declared.
 
 ## Known Limits
 
 - The format prose spec is not complete.
-- The CLI is minimal; library and Python package are the main surfaces.
+- The CLI covers inspection and export (`info`, `search`, `get`,
+  `export`); the library and Python package are the main surfaces for
+  building on.
 - The application schema surface is intentionally v1-shaped.
 - Hard-delete / crypto-shred semantics are deferred; compaction reclaims bytes
   but is not a compliance erase primitive.

@@ -17,8 +17,10 @@ every extension must keep.
 ## 1. Adding a lexical scoring algorithm
 
 Today's scorers (BM25, TF-IDF/count cosine + approx variants, Dice,
-overlap, containment, exact Jaccard) are free functions in
-`src/retrieval/` selected by enum dispatch. Adding, say, LM-Dirichlet or
+overlap, containment) are free functions in `src/retrieval/` selected by
+enum dispatch. Exact Jaccard also lives there but is reachable only
+through an engine-level retrieval profile — it is deliberately not in the
+application `Search` builder; use Dice there instead. Adding, say, LM-Dirichlet or
 a DFR variant:
 
 ### Files to touch
@@ -27,7 +29,7 @@ a DFR variant:
 |---|---|---|
 | 1 | `src/retrieval/<algo>.rs` | The scorer (see skeleton below). |
 | 2 | `src/retrieval.rs` | `pub mod <algo>;` |
-| 3 | `src/file.rs` | New `QueryAlgorithm` variant; dispatch arm in `query_text`; channel classification arm in `text_algorithm_channel` (or hybrid queries will error). |
+| 3 | `src/file/query_types.rs` | New `QueryAlgorithm` variant; dispatch arm in `query_text` (`src/file/text_ops.rs`); channel classification arm in `text_algorithm_channel` (or hybrid queries will error). |
 | 4 | `src/db/query.rs` | New `TextScorer` variant + its `to_algorithm()` arm — this is what applications see. |
 | 5 | tests | Unit tests in the scorer module (build state via `build_flush_output`), an integration case in `tests/db_search.rs`. |
 

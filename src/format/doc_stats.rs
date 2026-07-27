@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! `DocStatsSegment` payload codec, spec §12.4 (magic `NXTS`).
+//! `DocStatsSegment` payload codec, spec §12.4 (magic `VLTS`).
 //!
 //! Per-document statistics scoped to one `text_space_id`. Each delta
 //! segment carries new or updated rows; running state is reconstructed
@@ -191,7 +191,7 @@ pub(crate) fn decode_doc_stats_segment(bytes: &[u8]) -> Result<DocStatsSegment> 
     let magic = cur.read_array::<4>()?;
     if magic != MAGIC {
         return Err(Error::Format(format!(
-            "DocStatsSegment magic mismatch: expected NXTS, got {magic:?}"
+            "DocStatsSegment magic mismatch: expected VLTS, got {magic:?}"
         )));
     }
     let version = cur.read_u16()?;

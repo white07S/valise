@@ -11,7 +11,7 @@ use super::*;
 #[allow(clippy::too_many_arguments)]
 /// Specialized flush for the v2 columnar FrameCatalog wire form. Bypasses
 /// `encode_catalog_delta` (which uses bincode per row) and writes one
-/// `NXF2` segment per delta. Same chain semantics: each delta records the
+/// `VLF2` segment per delta. Same chain semantics: each delta records the
 /// previous segment as its parent so reload can walk backwards.
 pub(in crate::file) fn flush_frame_catalog_columnar(
     file: &mut File,

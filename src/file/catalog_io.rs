@@ -272,7 +272,7 @@ pub(super) fn read_frame_catalog_slim(
     let prof = std::env::var_os("VALISE_OPEN_PROFILE").is_some();
     let t_total = std::time::Instant::now();
     // Detect the FrameCatalog wire format on the most recent root —
-    // v2 (NXF2 magic, columnar) routes to a separate decoder that
+    // v2 (VLF2 magic, columnar) routes to a separate decoder that
     // populates `Vec<FrameDesc>` eagerly. v1 (VALISEC magic, bincode rows)
     // sticks with the slim+locator ghost-catalog path that's been the
     // open hot path since spec §10.
@@ -422,7 +422,7 @@ pub(super) fn read_frame_catalog_slim(
     Ok((stubs, locators, Vec::new()))
 }
 
-/// Walk a v2 (`NXF2`) FrameCatalog chain newest-first, union all
+/// Walk a v2 (`VLF2`) FrameCatalog chain newest-first, union all
 /// FrameDescs with newest-wins on `frame_id`, and return both the
 /// dedupe'd full Vec and the slim `(frame_id, status)` stubs derived
 /// from it. The columnar wire form decodes every field at once, so

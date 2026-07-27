@@ -19,10 +19,10 @@
 //!   pure function of `cells`; it is persisted either way so decode
 //!   never re-runs the fit).
 //!
-//! Wire layout — magic `NXUP`, version 1, little-endian throughout:
+//! Wire layout — magic `VLUP`, version 1, little-endian throughout:
 //!
 //! ```text
-//! [magic NXUP                : 4 B            ]
+//! [magic VLUP                : 4 B            ]
 //! [version u16 = 1           : 2 B            ]
 //! [dimension u32             : 4 B            ]
 //! [num_pairs u32             : 4 B            ] (= dimension / 2)
@@ -141,7 +141,7 @@ pub(crate) fn decode_upq_params(bytes: &[u8]) -> Result<UpqParams> {
         )));
     }
     if bytes[0..4] != UPQ_PARAMS_MAGIC {
-        return Err(Error::Format("UpqParams: bad magic (expected NXUP)".into()));
+        return Err(Error::Format("UpqParams: bad magic (expected VLUP)".into()));
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
     if version != UPQ_PARAMS_VERSION {

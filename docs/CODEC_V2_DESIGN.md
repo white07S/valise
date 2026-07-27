@@ -1,6 +1,6 @@
 # QAM Lloyd-Max Codec — Specification
 
-Status: **shipping codec wire spec**. The QAM params wire layout is `NXQL`
+Status: **shipping codec wire spec**. The QAM params wire layout is `VLQL`
 version 1 and remains part of the current v2.4 line (`FORMAT_MAJOR = 2`,
 `FORMAT_MINOR = 3`). Any QAM params on-disk change requires a wire-version bump.
 For the current vector search path, see [`VECTOR_SEARCH.md`](VECTOR_SEARCH.md):
@@ -36,7 +36,7 @@ phase_idx_k ∈ [0, 2^phase_bits)
 With `(amp_bits, phase_bits) = (5, 6)` this is **11 bits per complex
 pair = 5.5 bits per scalar = 0.6875 B/dim**.
 
-| dim   | num_pairs | bytes/vec @ (5, 6) |
+| dim   | num_pairs | bytes/vec @ (5, 6), unpadded |
 |------:|----------:|-------------------:|
 |   128 |        64 |                88  |
 |   768 |       384 |               528  |
@@ -44,13 +44,17 @@ pair = 5.5 bits per scalar = 0.6875 B/dim**.
 |  1536 |       768 |             1,056  |
 |  3072 |     1,536 |             2,112  |
 
+These are the bit-packed payload sizes. On disk the amplitude and phase
+streams are each padded to a 64-byte cache line, so the figure quoted in
+`VECTOR_SEARCH.md` is larger — 576 B at dim 768 rather than 528 B.
+
 ## Wire layout — `QamLloydMaxParams`
 
-Source of truth: `src/format/qam_lloyd_max_params.rs`. Magic `NXQL`,
+Source of truth: `src/format/qam_lloyd_max_params.rs`. Magic `VLQL`,
 version 1, little-endian throughout:
 
 ```text
-[magic NXQL                : 4 B            ]
+[magic VLQL                : 4 B            ]
 [version u16 = 1           : 2 B            ]
 [dimension u32             : 4 B            ]
 [num_pairs u32             : 4 B            ] (= dimension / 2)
@@ -175,6 +179,6 @@ peer comparison against `usearch` and `hnsw_rs`. See
 [`bench/REPRODUCE.md`](../bench/REPRODUCE.md) for the command line and expected
 numbers.
 
-The `NXQL` wire-format version is independent of the top-level Valise format
-minor. A change to the QAM params byte layout must bump the `NXQL` wire version
+The `VLQL` wire-format version is independent of the top-level Valise format
+minor. A change to the QAM params byte layout must bump the `VLQL` wire version
 and add codec-level tests for old/new rejection behavior.

@@ -2,13 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! `PostingsSegment` payload codec, spec §12.2 (magic `NXTP`).
+//! `PostingsSegment` payload codec, spec §12.2 (magic `VLTP`).
 //!
 //! v3 split-directory layout (Exploit A1 "lazy postings" + tf=1
 //! exception encoding):
 //!
 //! ```text
-//! [magic NXTP][version u16 = 3][text_space_id u32][previous_root]
+//! [magic VLTP][version u16 = 3][text_space_id u32][previous_root]
 //! [blob_len u32][blob: per-term varint streams concatenated]
 //! [dir_count u32][dir entries (24 B each): term_id u32, df u32, cf u64,
 //!                  blob_off u32, blob_len u32]
@@ -329,7 +329,7 @@ pub(crate) fn decode_postings_segment_directory(bytes: &[u8]) -> Result<Postings
     let magic = cur.read_array::<4>()?;
     if magic != MAGIC {
         return Err(Error::Format(format!(
-            "PostingsSegment magic mismatch: expected NXTP, got {magic:?}"
+            "PostingsSegment magic mismatch: expected VLTP, got {magic:?}"
         )));
     }
     let version = cur.read_u16()?;

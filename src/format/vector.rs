@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! `VectorDataSegment` payload codec, spec §14.2 (magic `NXVD`).
+//! `VectorDataSegment` payload codec, spec §14.2 (magic `VLVD`).
 //!
 //! The header is fixed size; the two blocks (`ids`, `base`) follow at
 //! offsets declared in the header. Each block is a fixed-stride array

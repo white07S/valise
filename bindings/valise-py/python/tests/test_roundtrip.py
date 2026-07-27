@@ -145,3 +145,47 @@ def test_persists_across_reopen_no_redeclare(tmp_path):
     got = s2.get("kb", "survivor")
     assert got is not None
     assert got.text == "durable"
+
+
+def test_reader_keys_enumerates_committed_keys(tmp_path):
+    """`Reader.keys` mirrors Rust's `Reader::keys` — the scan primitive.
+
+    Order is unspecified, so compare as sets. Uncommitted records must not
+    appear, which is what separates this from "everything ever put".
+    """
+    s = valise.Store.create(str(tmp_path / "keys.vls"))
+    s.collection("notes", valise.Schema().text("body"))
+
+    with s.writer() as w:
+        for k in ("a", "b", "c"):
+            w.put("notes", k, valise.Record().text("body", f"body of {k}"))
+        # Before commit, a fresh reader sees nothing.
+        assert s.reader().keys("notes") == []
+        w.commit()
+
+    assert set(s.reader().keys("notes")) == {"a", "b", "c"}
+
+    # Deleting removes the key from the scan.
+    with s.writer() as w:
+        w.delete("notes", "b")
+        w.commit()
+    assert set(s.reader().keys("notes")) == {"a", "c"}
+
+    # keys + get_many is the documented way to walk a whole collection.
+    r = s.reader()
+    ks = r.keys("notes")
+    assert {st.text for st in r.get_many("notes", ks) if st} == {
+        "body of a",
+        "body of c",
+    }
+
+
+def test_reader_keys_handles_int_keys(tmp_path):
+    """Keys round-trip as the variant they were written as, not as strings."""
+    s = valise.Store.create(str(tmp_path / "intkeys.vls"))
+    s.collection("nums", valise.Schema().text("body"))
+    with s.writer() as w:
+        for i in (1, 2, 3):
+            w.put("nums", i, valise.Record().text("body", str(i)))
+        w.commit()
+    assert set(s.reader().keys("nums")) == {1, 2, 3}
