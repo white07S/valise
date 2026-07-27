@@ -107,35 +107,113 @@ The knock-on effects matter more than the number:
 - **Re-indexing from scratch becomes a reasonable default** instead of an
   overnight job.
 
-## Vectors at 5–6× smaller
+## Compression: the part that's genuinely hard
 
-Polar quantization stores each rotated coordinate pair as one joint cell index
-at **5.5 bits per dimension**. Against recall-matched graph indexes, measured
-whole-file — payload framing, IDs, catalog and all:
+Compression claims are easy to make and hard to calibrate, so here is the
+whole frontier. Cohere-v2, 768 dimensions, 100k vectors, every system tuned to
+its best operating point <sub>[†](#check-the-numbers-yourself)</sub>:
 
-| d=768, 100k vectors, recall@10 ≈ 0.965 <sub>[†](#check-the-numbers-yourself)</sub> | Bytes per vector |
+| Bytes/vector | System | recall@10 | Query p50 |
+|---:|---|---:|---:|
+| 120 | sqlite-vec 1-bit | 0.486 | 7,821 µs |
+| 151 | FAISS IVF-PQ | 0.611 | 438 µs |
+| 151 | FAISS RaBitQ | 0.757 | 807 µs |
+| 174 | FAISS OPQ+IVF-PQ | 0.747 | 445 µs |
+| 245 | USearch binary | 0.485 | 57 µs |
+| **585** | **Valise** | **0.965** | **532 µs** |
+| 768 | FAISS SQ8 (exact scan) | 0.989 | 13,762 µs |
+| 815 | FAISS IVF-SQ8 | 0.974 | 2,094 µs |
+| 917 | USearch int8 | 0.880 | 336 µs |
+| 3,221 | USearch BF16 / hnswlib | 0.966 | 544 / 743 µs |
+| 3,344 | FAISS HNSW | 0.968 | 237 µs |
+
+Read the whole table before the bold row. Two things fall out of it:
+
+**Nothing below 585 bytes per vector gets past 0.757 recall.** Every
+aggressive quantizer on the market — product quantization, RaBitQ, binary
+codes, 1-bit — buys its size by giving up a quarter to a half of the
+neighbors.
+
+**Valise is the only configuration under 3 KB per vector that clears 0.96
+recall in under a millisecond.** The systems in between get their recall from
+exact or near-exact scans and pay 4–26× the query latency for it. The cheapest
+peer that matches both our recall *and* our latency is hnswlib, at **5.5× the
+bytes** — because it stores full-precision vectors *and* a graph.
+
+### Why 5.5 bits per dimension is the interesting number
+
+At that budget the obvious approaches break. Scalar quantization at the *same*
+bits reaches 0.940. A one-bit sign code reaches 0.541. Skipping the rotation
+step costs half a point.
+
+What closes the gap is quantizing rotated coordinate *pairs* in polar form —
+one joint cell index over amplitude rings with power-of-two phase counts,
+fitted in closed form to the distribution the rotation produces.
+
+Here is the result worth pausing on. Against a **trained** 2,048-centroid
+k-means codebook at the same bit budget:
+
+| | recall@10 |
 |---|---:|
-| **Valise** | **585 B** |
-| FAISS HNSW | 3,344 B |
-| Raw `float32` | 3,072 B |
+| Trained k-means codebook | 0.968 |
+| Valise, closed-form fit | 0.967 |
 
-Payloads are zstd-compressed on top of that. Compare against an exact scan and
-Valise is **85–130× faster** than sqlite-vec at equal recall — 532 µs versus
-45.5 ms.
+Statistically indistinguishable. A formula matches a learned codebook — which
+means no training pass, no codebook to ship alongside your data, and no
+data-dependent artifact baked into your file.
 
-## Text that doesn't need re-indexing
+And then the part no other quantizer in that table does: **the codes are also
+the index.** Everyone else pays for compression *and* a separate search
+structure. Valise derives its candidate sketch from the same bytes it already
+stored, so the compression and the search acceleration come out of one
+representation.
 
-Valise doesn't persist an engine's index image. It persists the *statistics* —
-canonical term dictionaries, frame-sorted postings, document stats — and scores
-at query time. Two consequences:
+## The text engine is not an afterthought
 
-**Smaller.** On BEIR corpora of 2.7M–5.4M documents, the lexical index is
-**30–43% smaller than Tantivy's** <sub>[†](#check-the-numbers-yourself)</sub>, at
-equal or better nDCG@10.
+Most "hybrid" systems bolt a keyword index onto a vector store. Valise's
+lexical side was built first, and it holds up against Tantivy — the Rust
+Lucene — across four BEIR corpora of 2.7M to 5.4M documents
+<sub>[†](#check-the-numbers-yourself)</sub>:
 
-**Any scorer, no rebuild.** BM25, TF-IDF cosine, count cosine, Dice, overlap,
-containment — chosen per query, over one index. A new scoring function applies
-to files that already exist without rewriting a byte.
+| Corpus | Index size | nDCG@10 | Recall@100 | Query p50 |
+|---|---|---|---|---|
+| NQ (2.7M docs) | **43% smaller** | **0.300** vs 0.283 | **0.766** vs 0.720 | **12.0× faster** |
+| DBpedia-entity (4.6M) | **32% smaller** | **0.302** vs 0.275 | **0.444** vs 0.404 | **5.9× faster** |
+| HotpotQA (5.2M) | **36% smaller** | **0.591** vs 0.586 | **0.771** vs 0.764 | **1.18× faster** |
+| FEVER (5.4M) | **40% smaller** | 0.512 vs **0.515** | **0.863** vs 0.859 | 0.71× — Tantivy wins |
+
+**Smaller on all four. Better recall@100 on all four. Better nDCG@10 on three
+of four**, and the fourth is a 0.003 difference — noise.
+
+Beating a Lucene-lineage engine on *relevance*, not just on size, is the part
+we'd have expected to lose.
+
+**On latency, the regime matters and we'd rather explain it than quote the best
+number.** Short queries — entity names, keyword-shaped questions — run 6–12×
+faster. Long multi-hop questions and claim-verification queries converge, and
+on FEVER Tantivy is 1.4× faster. The pattern is mechanical: more query terms
+means more postings to score, and our per-term advantage narrows as the term
+count grows. If your queries look like NQ or DBpedia, expect the top of that
+range. If they look like FEVER, expect parity.
+
+Tantivy builds its index 3–4× faster than we do. Our commit includes a
+durability barrier and full canonicalization; theirs doesn't.
+
+### One index, any scorer, no re-indexing
+
+This is the architectural difference, and it's the one that compounds.
+
+Lucene and Tantivy persist an *index image* — the scoring function is baked
+into the bytes on disk. Change the scorer and you rebuild.
+
+Valise persists the **statistics**: canonical term dictionaries, frame-sorted
+postings, document stats. Scoring happens at query time. So BM25, TF-IDF
+cosine, count cosine, approximate cosine variants, Dice, overlap, and
+containment all read the same index — chosen per query, not per build.
+
+A new scoring function applies to files that already exist, without rewriting
+a byte. Ship a corpus today, change how you rank it next quarter, and the
+files your users already have keep working.
 
 ## Crash safety that went looking for trouble
 
@@ -341,8 +419,9 @@ results, and the cases where Valise loses.
 **† — from a larger study, not reproducible here yet.** The portability,
 build-time, storage, lexical-size and crash-campaign figures come from runs at
 100k–1M vectors against recall-matched baselines, on corpora that need separate
-download (some behind a gated licence). The methodology is written up in an
-accompanying systems paper. We keep these visually separate from the ‡ numbers
+download (some behind a gated licence). The full methodology is written up in a
+systems paper currently under submission — **a preprint link will be added here
+when it goes up.** We keep these visually separate from the ‡ numbers
 rather than blending them, because you can check one set today and have to take
 our word on the other — and you shouldn't have to guess which is which.
 
