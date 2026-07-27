@@ -466,6 +466,11 @@ pub(crate) fn scalar_pair_magnitudes(pairs: &[f32], mags: &mut [f32]) {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "tests report skipped ISA cases"
+)]
 mod tests {
     use super::*;
     use crate::codec::prng::SplitMix64;

@@ -21,4 +21,5 @@ pub(super) mod x86_64;
 // without a `#[path]` override; the tests reach `hamming_scalar` via
 // `super::super` (the parent `sketch` module).
 #[cfg(all(test, target_arch = "x86_64"))]
+#[allow(clippy::print_stderr, reason = "tests report skipped ISA cases")]
 mod x86_64_tests;

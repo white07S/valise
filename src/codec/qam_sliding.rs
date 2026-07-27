@@ -400,6 +400,7 @@ impl QamSlidingEngine {
 }
 
 #[cfg(all(test, target_arch = "x86_64"))]
+#[allow(clippy::print_stderr, reason = "tests report skipped ISA cases")]
 mod x86_64_parity_tests {
     //! Bit-exact AVX2 vs scalar parity for the SDOT kernel
     //! (`docs/X86_64_SIMD_PLAN.md` §8.1 integer rule + §11 cross-
