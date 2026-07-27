@@ -43,6 +43,12 @@ jobs:
       # Warnings are errors. The deliberate exceptions live in
       # `[lints.clippy]` in Cargo.toml with a justification each, so a new
       # warning here means either fix it or argue for it in the manifest.
+      #
+      # Note the toolchain floats on `stable`, so a Rust release that adds
+      # lints can turn this red without any change on our side. That is the
+      # accepted trade — the lints are usually worth taking — but if a
+      # release lands mid-review, fix the lint rather than reaching for an
+      # allow.
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 

@@ -502,13 +502,11 @@ impl ValiseFile {
             .unwrap_or(crate::format::segment::Compression::None);
 
         let payload = if compression == crate::format::segment::Compression::None {
-            match self.file_mmap.as_ref().and_then(|m| {
-                if segment.offset + segment.length <= m.len() as u64 {
-                    Some(m)
-                } else {
-                    None
-                }
-            }) {
+            match self
+                .file_mmap
+                .as_ref()
+                .filter(|m| segment.offset + segment.length <= m.len() as u64)
+            {
                 Some(mmap) => {
                     let segment_payload =
                         mmap_segment_payload(mmap, segment, SegmentType::Payload)?;

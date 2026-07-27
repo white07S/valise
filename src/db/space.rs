@@ -287,12 +287,17 @@ impl SchemaRegistry {
                 schema_doc::KIND_VECTOR => {
                     if let Some(entry) = self.vector_spaces.get(&f.space) {
                         Field::Vector(Space::vector(&f.space, entry.dim))
-                    } else if let Some(spec) = f.vector_spec() {
+                    } else {
                         // Never-calibrated auto space: reconstruct the
                         // deferred entry from the persisted spec. Prebuilt
                         // codecs are registered eagerly at declare and so
                         // are always in the catalog; a parse failure here
                         // (e.g. a future codec family) degrades.
+                        //
+                        // A missing spec ("spec":null) is a shared binding
+                        // to a space absent from the catalog — not
+                        // reconstructable, see the schema_doc module doc.
+                        let spec = f.vector_spec()?;
                         let metric = schema_doc::metric_from_str(&spec.metric).ok()?;
                         let codec = spec.codec.to_codec_spec().ok()?;
                         self.vector_spaces.insert(
@@ -307,11 +312,6 @@ impl SchemaRegistry {
                             },
                         );
                         Field::Vector(Space::vector(&f.space, spec.dim))
-                    } else {
-                        // Shared binding ("spec":null) to a space absent
-                        // from the catalog (deferred shared space): not
-                        // reconstructable — see the schema_doc module doc.
-                        return None;
                     }
                 }
                 // Future field kinds: degrade rather than guess.
