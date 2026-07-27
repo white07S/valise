@@ -11,6 +11,51 @@ in [MIGRATION.md](MIGRATION.md).
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-27
+
+Storage introspection, and the evidence behind the durability claims. The
+on-disk format is unchanged from 0.1.0 — files written by any 0.1.x are
+readable by any other.
+
+### Added
+
+- `ReadConnection::storage_breakdown()` returns live bytes per segment type,
+  so you can see where a capsule's size actually goes without external tools.
+- `valise info --segments` prints the same accounting from the shell, with
+  percentage shares, and `--segments --json` emits it machine-readably. The
+  breakdown counts live segments only; the gap against the file size on disk
+  is what `Store::compact` would reclaim.
+- [`docs/ANATOMY.md`](docs/ANATOMY.md) — where the bytes go in a real
+  100,000-record capsule, measured rather than described, with a component-wise
+  comparison against SQLite + FTS5 + sqlite-vec. Includes the honest finding
+  that the two lexical indexes are near-identical in size (9.7 vs 10.0 MiB):
+  the 2.3× total advantage comes from quantized vectors and compressed
+  payloads, not from beating FTS5.
+- [`bench/CRASH_CAMPAIGN.md`](bench/CRASH_CAMPAIGN.md) — how to reproduce the
+  crash-consistency results. Both harnesses already shipped but neither was
+  documented, so the README's strongest claim had no path to its evidence.
+  The 122,200-injection campaign is seeded, replays bit-for-bit, needs no
+  downloaded data, and completes in about 100 seconds.
+- A social preview card, so shared links render as something other than a
+  grey placeholder.
+
+### Changed
+
+- Rewrote `long_lived_writer_does_not_block_concurrent_readers` to assert a
+  structural property instead of a wall-clock one. It bounded both loops by a
+  200 ms budget and then required the writer to land two commits inside it,
+  which fails on a loaded runner whenever one `F_FULLFSYNC` runs long — a
+  property the test was never meant to measure.
+
+### Fixed
+
+- Removed 18 commit hashes and 7 gitignored paths from `docs/VECTOR_SEARCH.md`
+  that referenced a pre-rename repository and resolved to nothing. The
+  experimental results stay; the false promise of traceability does not.
+- Corrected seven `NXTC`/`NXSG` references in comments and error messages,
+  left over from the pre-rename magic bytes. The constants themselves were
+  already `VLTC`/`VLSG`.
+
 ## [0.1.2] — 2026-07-27
 
 Documentation and positioning. No code changes; the on-disk format and the
@@ -105,7 +150,8 @@ and hybrid search over it with no server and no sidecar index directory.
 - Valise stores vectors; it does not generate embeddings, and it does not
   encrypt capsules.
 
-[Unreleased]: https://github.com/white07S/valise/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/white07S/valise/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/white07S/valise/releases/tag/v0.1.3
 [0.1.2]: https://github.com/white07S/valise/releases/tag/v0.1.2
 [0.1.1]: https://github.com/white07S/valise/releases/tag/v0.1.1
 [0.1.0]: https://github.com/white07S/valise/releases/tag/v0.1.0
