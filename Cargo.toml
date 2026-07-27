@@ -1,6 +1,6 @@
 [package]
 name = "valise"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.87"
 description = "Single-file retrieval capsule for local-first AI: text and vector search over one portable file"

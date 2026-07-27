@@ -11,6 +11,37 @@ in [MIGRATION.md](MIGRATION.md).
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-07-27
+
+Documentation and positioning. No code changes; the on-disk format and the
+API are identical to 0.1.0.
+
+Note that 0.1.1 reached PyPI but never reached crates.io — the publish token
+lacked the `publish-update` scope. This release brings both registries back
+onto the same version.
+
+### Changed
+
+- Rewrote the README around what the project is actually for: shipping a
+  retrieval corpus as a file, rather than a feature list. Leads with the
+  copy-under-write result (50/50 mid-write copies opened to a correct
+  snapshot, against 4/50 for a composed deployment and 0/50 for SQLite).
+- Added the compression frontier at d=768 — every peer sorted by bytes,
+  with recall and latency beside it. Nothing below 585 B/vector exceeds
+  0.757 recall, and Valise is the only configuration under 3 KB/vector that
+  clears 0.96 recall in under a millisecond.
+- Gave the text engine its own section. Across four BEIR corpora of 2.7M–5.4M
+  documents it is 32–43% smaller than Tantivy, better on recall@100 on all
+  four, and better on nDCG@10 on three of four. Latency is stated as a regime
+  (6–12× faster on short queries, converging on long ones, slower on FEVER)
+  rather than as a single headline number.
+- Documented that scoring happens at query time over persisted statistics, so
+  a new scorer applies to files that already exist without re-indexing.
+- Added worked examples: hybrid RAG, per-agent memory with recency decay,
+  time-partitioned logs, and shipping an artifact through CI.
+- Every code sample in the README, the crate docs, and the Python package
+  description is executed before release.
+
 ## [0.1.1] — 2026-07-27
 
 Documentation only. No code changes; the on-disk format and the API are
@@ -74,6 +105,7 @@ and hybrid search over it with no server and no sidecar index directory.
 - Valise stores vectors; it does not generate embeddings, and it does not
   encrypt capsules.
 
-[Unreleased]: https://github.com/white07S/valise/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/white07S/valise/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/white07S/valise/releases/tag/v0.1.2
 [0.1.1]: https://github.com/white07S/valise/releases/tag/v0.1.1
 [0.1.0]: https://github.com/white07S/valise/releases/tag/v0.1.0
