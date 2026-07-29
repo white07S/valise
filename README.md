@@ -83,6 +83,20 @@ Two of SQLite's "successful" copies passed `integrity_check` and then served
 bytes that differed from writes it had already acknowledged. Valise's copies
 were byte-verified against the acknowledged write set every time.
 
+**What that 0/50 does and does not mean.** It measures a plain `cp` of the
+live database file, in both `journal_mode=DELETE` and WAL, with the `-wal`
+and `-shm` sidecars deliberately not copied — because that is the naive case.
+SQLite ships `VACUUM INTO` and an online backup API precisely for this, and
+either produces a sound copy. The honest claim is *"copying a live SQLite
+database with `cp` is unsafe, and Valise makes `cp` safe"* — not that SQLite
+cannot do it.
+
+**And the artifact sizes are not recall-matched.** The SQLite baseline stores
+`vec0(embedding float[768])` — full precision, 3,072 B/vector — against our
+585 B/vector quantized codes. **About 68% of that 626 MB gap is quantization,
+not file format** (171,332 docs × 2,487 B ≈ 426 MB). The format earns the
+remainder, plus the single-file property in the row above it.
+
 And the results are the same on the far side: **identical top-10 hits for
 lexical, vector, and hybrid queries** across macOS/AArch64 and Linux/x86-64,
 from the same file, with no reconfiguration.
@@ -134,12 +148,19 @@ its best operating point <sub>[†](#check-the-numbers-yourself)</sub>:
 | 151 | FAISS RaBitQ | 0.757 | 807 µs |
 | 174 | FAISS OPQ+IVF-PQ | 0.747 | 445 µs |
 | 245 | USearch binary | 0.485 | 57 µs |
-| **585** | **Valise** | **0.965** | **532 µs** |
+| **585** | **Valise** (UPQ codec) | **0.965** | **532 µs** |
 | 768 | FAISS SQ8 (exact scan) | 0.989 | 13,762 µs |
 | 815 | FAISS IVF-SQ8 | 0.974 | 2,094 µs |
 | 917 | USearch int8 | 0.880 | 336 µs |
 | 3,221 | USearch BF16 / hnswlib | 0.966 | 544 / 743 µs |
 | 3,344 | FAISS HNSW | 0.968 | 237 µs |
+
+Two notes on reading the table. Valise's row is the **UPQ** codec at 585 B/vector
+on disk; the default **QAM(5,6)** codec lands at 617 B/vector for the same recall
+(544 B and 576 B of codes respectively, plus 41 B of per-vector descriptors in
+both cases — see [VECTOR_SEARCH.md](docs/VECTOR_SEARCH.md)). And Valise's latency
+here is an all-core figure while the peer numbers are single-core; on one core
+it is ~1,061 µs.
 
 Read the whole table before the bold row. Two things fall out of it:
 
@@ -148,11 +169,12 @@ aggressive quantizer on the market — product quantization, RaBitQ, binary
 codes, 1-bit — buys its size by giving up a quarter to a half of the
 neighbors.
 
-**Valise is the only configuration under 3 KB per vector that clears 0.96
-recall in under a millisecond.** The systems in between get their recall from
-exact or near-exact scans and pay 4–26× the query latency for it. The cheapest
-peer that matches both our recall *and* our latency is hnswlib, at **5.5× the
-bytes** — because it stores full-precision vectors *and* a graph.
+**Four systems clear 0.96 recall in under a millisecond — and Valise does it
+in 5.5–5.7× fewer bytes than any of them.** USearch BF16 (0.966 at 544 µs),
+hnswlib (0.966 at 743 µs) and FAISS HNSW (0.968 at 237 µs) all reach that
+recall too, and FAISS HNSW is faster per query than we are. They pay for it in
+storage: 3,221–3,344 B/vector, because they keep full-precision vectors *and* a
+graph. That is the trade — our bytes, their latency.
 
 ### Why 5.5 bits per dimension is the interesting number
 
@@ -202,8 +224,23 @@ Lucene — across four BEIR corpora of 2.7M to 5.4M documents
 **Smaller on all four. Better recall@100 on all four. Better nDCG@10 on three
 of four**, and the fourth is a 0.003 difference — noise.
 
-Beating a Lucene-lineage engine on *relevance*, not just on size, is the part
-we'd have expected to lose.
+**Two caveats, because this comparison is easy to over-read.**
+
+*The tokenizers differ.* Valise stems (Porter2); the Tantivy baseline uses its
+default `TEXT` analyzer, which lowercases but does not stem. Same corpus, same
+fields, same BM25 parameters, same grader — but stemming helps recall, and we
+have it and the baseline does not. Read this as **parity with default Tantivy
+at 32–43% of the index size**, not as beating a Lucene-lineage engine on
+relevance.
+
+*Neither engine here is state-of-the-art BM25.* Published Anserini/Lucene
+reference numbers on these same corpora are higher than both of us — notably
+HotpotQA ≈ 0.633 against our 0.591, and FEVER ≈ 0.651 flat (0.753 multifield)
+against our 0.512. Anserini's multifield setup weights title separately, where
+this benchmark concatenates title into the body for both engines. If you need
+best-in-class BM25 relevance, Anserini is still the reference implementation.
+What this table shows is that the lexical side is a real engine rather than a
+checkbox, at a fraction of the index size.
 
 **On latency, the regime matters and we'd rather explain it than quote the best
 number.** Short queries — entity names, keyword-shaped questions — run 6–12×
@@ -239,7 +276,7 @@ a crash a reader sees the previous committed state or the new one, never a
 mixture. If the active footer is unusable, recovery scans back to the newest
 one that fully validates.
 
-That was tested rather than asserted: **122,200 seeded fault injections** across
+That was tested rather than asserted: **122,200 seeded fault cases** across
 ten fault classes, plus **200 virtual-machine power cuts** over ext4, XFS and
 btrfs covering **493,931 acknowledged commits**. Zero wrong data, zero lost
 commits, zero panics.
@@ -253,7 +290,7 @@ perfectly the first time.
 Both harnesses ship in this repository and the campaign is seeded, so it
 replays bit-for-bit: **[bench/CRASH_CAMPAIGN.md](bench/CRASH_CAMPAIGN.md)** has
 the exact invocations, the ten fault classes, and how to read the outcomes.
-All 122,200 injections run in **under two minutes** and need no data files —
+All 122,200 cases run in **under two minutes** and need no data files —
 you can check the claim above before you finish reading this page.
 
 ---
@@ -275,10 +312,21 @@ If you build once and serve a billion queries against a static corpus, build
 the graph — use Qdrant, LanceDB, or Milvus, and be happy.
 
 The rule of thumb from the measurements: prefer Valise when the corpus fits
-your latency budget through a scan — roughly **a million vectors per
-millisecond of budget at d=768** — *or* at any scale when the corpus is
-copied, shipped, or rebuilt more often than about once per ten thousand
-queries. Below ~256 dimensions, a tuned index wins outright.
+your latency budget through a scan. At d=768, **100k vectors take about 1 ms
+on one modern aarch64 core, and about 6.7 ms on a 2017-era x86 laptop even
+across all of its threads.** The scan is linear in corpus size, so scale it
+that way — and size against the slower number unless you know the hardware.
+
+<sub>p50 over 1,000 queries: 1,061 µs single-threaded on an Apple M4 Max;
+6,722 µs at ~7 cores of CPU per query on an Intel i7-8550U
+([REPRODUCE.md](bench/REPRODUCE.md) §6). Both use the harness default
+`channel_k = N/4`, a larger candidate budget than the shipped default, so
+both are conservative. Measured at 100k; no scaling curve past that is
+published yet.</sub>
+
+*Or* reach for Valise at any scale when the corpus is copied, shipped, or
+rebuilt more often than about once per ten thousand queries. Below ~256
+dimensions, a tuned index wins outright.
 
 **Reach for Valise when:**
 

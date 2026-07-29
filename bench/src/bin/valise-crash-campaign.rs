@@ -1815,10 +1815,19 @@ fn main() -> Result<()> {
     }
     fs::write(&cli.out, serde_json::to_string_pretty(&report)?).context("write --out JSON")?;
 
+    // `classes x --iters-per-class` is never the campaign total: two
+    // classes carry their own budgets (--cycle-iters, --kill-iters), so
+    // that phrasing under-reported the default run by 1,200 cases and
+    // contradicted the per-class lines printed just above. `totals.cases`
+    // counts one case per iteration of every class and cannot drift.
     println!(
-        "campaign complete: {} classes x {} iterations in {:.1}s -> {}",
+        "campaign complete: {} cases across {} classes \
+         (--iters-per-class {}, --cycle-iters {}, --kill-iters {}) in {:.1}s -> {}",
+        report.totals.cases,
         report.classes.len(),
         report.config.iters_per_class,
+        report.config.cycle_iters,
+        report.config.kill_iters,
         report.campaign_wall_seconds,
         cli.out.display()
     );

@@ -56,10 +56,14 @@
 //!
 //! The bill is that the candidate scan is linear in corpus size, so a
 //! mature graph answers individual queries faster. Prefer Valise when the
-//! corpus fits your latency budget through a scan — roughly a million
-//! vectors per millisecond at d=768 — or at any scale when it is copied,
-//! shipped, or rebuilt more often than about once per ten thousand
-//! queries. Below ~256 dimensions a tuned index wins outright.
+//! corpus fits your latency budget through a scan: at d=768, 100k vectors
+//! take ~1 ms on one modern aarch64 core (p50 1,061 µs, Apple M4 Max) and
+//! ~6.7 ms on an older AVX2 x86 laptop even across all its threads (p50
+//! 6,722 µs, Intel i7-8550U) — see `bench/REPRODUCE.md` §6. Scale linearly,
+//! and size against the slower number unless you know the hardware. Or
+//! reach for it at any scale when the corpus is copied, shipped, or rebuilt
+//! more often than about once per ten thousand queries. Below ~256
+//! dimensions a tuned index wins outright.
 //!
 //! It is **not** a hosted vector database or a distributed search cluster,
 //! and **it does not generate embeddings** — bring your own model.

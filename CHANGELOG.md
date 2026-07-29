@@ -72,7 +72,7 @@ readable by any other.
 - [`bench/CRASH_CAMPAIGN.md`](bench/CRASH_CAMPAIGN.md) — how to reproduce the
   crash-consistency results. Both harnesses already shipped but neither was
   documented, so the README's strongest claim had no path to its evidence.
-  The 122,200-injection campaign is seeded, replays bit-for-bit, needs no
+  The 122,200-case campaign is seeded, replays bit-for-bit, needs no
   downloaded data, and completes in about 100 seconds.
 - A social preview card, so shared links render as something other than a
   grey placeholder.

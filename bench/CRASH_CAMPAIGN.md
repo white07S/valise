@@ -26,7 +26,7 @@ cargo build --release -p valise-bench --bin valise-crash-campaign
   --out bench/results/crash_campaign.json
 ```
 
-That invocation is exactly the **122,200 injections** cited in the README:
+That invocation is exactly the **122,200 fault cases** cited in the README:
 eight classes at 15,000 iterations, plus 2,000 `crash-recover-cycle` and 200
 `sigkill-storm` (both default, both budgeted separately because each iteration
 costs several durable commits or a real process spawn).
@@ -57,7 +57,7 @@ $ ./target/release/valise-crash-campaign --iters-per-class 15000 \
 [sigkill-storm]         cases=200   newest=200   previous=0     rejected_at_read=0     wrong_data=0 panic=0
 [compaction-install]    cases=15000 newest=15000 previous=0     rejected_at_read=0     wrong_data=0 panic=0
 
-campaign complete: 10 classes x 15000 iterations in 100.6s
+campaign complete: 122200 cases across 10 classes (--iters-per-class 15000, --cycle-iters 2000, --kill-iters 200) in 100.6s
 totals: newest=29364 previous=56373 rejected_at_read=34470 clean_reject=1993 wrong_data=0 panic=0
 ```
 
