@@ -117,7 +117,10 @@ impl QamSlidingEngine {
                 src.amp_bits, src.phase_bits
             )));
         }
-        debug_assert!(src.num_pairs.is_multiple_of(8));
+        // `num_pairs` need NOT be a multiple of 8: the dispatcher runs
+        // the SIMD/scalar kernels over the `num_pairs / 8` whole groups
+        // and folds the trailing `num_pairs % 8` pairs in scalar tails
+        // (see `raw_dot_int` / `y_hat_norm`), so any positive count works.
 
         let amp_max = src
             .amp_levels_unit
@@ -212,17 +215,48 @@ impl QamSlidingEngine {
             &base[self.amp_stream_offset..self.amp_stream_offset + self.amp_stream_bytes];
         let phase_stream =
             &base[self.phase_stream_offset..self.phase_stream_offset + self.phase_stream_bytes];
+        // The SIMD kernels (and the scalar reference) iterate exactly
+        // `num_pairs / 8` groups with no tail, so they drop the last
+        // `num_pairs % 8` pairs and would underflow (`groups - 1`) when
+        // `num_pairs < 8`. Only take the full-group path when there is at
+        // least one whole group; when the count is an exact multiple of 8
+        // return `full` unchanged so the aligned fast path stays
+        // byte-identical.
+        let full = if self.num_pairs >= 8 {
+            self.raw_dot_int_full(amp_stream, phase_stream, &prep.q_i8)
+        } else {
+            0
+        };
+        if self.num_pairs % 8 == 0 {
+            return full;
+        }
+        full + self.raw_dot_int_tail(amp_stream, phase_stream, &prep.q_i8, self.num_pairs / 8)
+    }
 
+    /// Full-group dispatch: scores exactly `num_pairs / 8` whole groups
+    /// via the arch-specific SIMD kernel (or the scalar reference). The
+    /// remaining `num_pairs % 8` pairs are handled by
+    /// [`Self::raw_dot_int_tail`]. Callers must only invoke this when
+    /// `num_pairs >= 8` — the kernels compute `groups = num_pairs / 8`
+    /// with no bounds slack for a zero-group call.
+    fn raw_dot_int_full(&self, amp_stream: &[u8], phase_stream: &[u8], q_i8: &[i8]) -> i64 {
+        // Feed the kernels the whole-group count (a multiple of 8). This is
+        // computationally identical to passing `num_pairs` — the kernels
+        // derive `groups = n / 8` either way — but it keeps the kernels'
+        // `debug_assert!(num_pairs % 8 == 0 && num_pairs >= 8)` satisfied for
+        // a misaligned space, so debug builds stay panic-free. The trailing
+        // `num_pairs % 8` pairs are added by `raw_dot_int_tail`.
+        let full_pairs = (self.num_pairs / 8) * 8;
         #[cfg(target_arch = "aarch64")]
         unsafe {
             return simd::aarch64::raw_dot_int(
                 &self.amp_table_i8,
                 &self.cos_table_i8,
                 &self.sin_table_i8,
-                self.num_pairs,
+                full_pairs,
                 amp_stream,
                 phase_stream,
-                &prep.q_i8,
+                q_i8,
             );
         }
 
@@ -239,10 +273,10 @@ impl QamSlidingEngine {
                 &self.amp_table_i8,
                 &self.cos_table_i8,
                 &self.sin_table_i8,
-                self.num_pairs,
+                full_pairs,
                 amp_stream,
                 phase_stream,
-                &prep.q_i8,
+                q_i8,
             );
         }
         #[cfg(all(target_arch = "x86_64", not(target_feature = "avx2")))]
@@ -256,7 +290,7 @@ impl QamSlidingEngine {
                         self.num_pairs,
                         amp_stream,
                         phase_stream,
-                        &prep.q_i8,
+                        q_i8,
                     );
                 }
             }
@@ -264,8 +298,48 @@ impl QamSlidingEngine {
 
         #[allow(unreachable_code)]
         {
-            self.raw_dot_int_scalar(amp_stream, phase_stream, &prep.q_i8)
+            self.raw_dot_int_scalar(amp_stream, phase_stream, q_i8)
         }
+    }
+
+    /// Score the trailing `num_pairs % 8` pairs that the full-group
+    /// kernels skip. `group` is the number of whole 8-pair groups already
+    /// consumed (`num_pairs / 8`); everything past `group * 8` is handled
+    /// here. Bit-identical to the per-pair math in `raw_dot_int_scalar`,
+    /// so aligned + tail together reproduce the reference exactly.
+    fn raw_dot_int_tail(
+        &self,
+        amp_stream: &[u8],
+        phase_stream: &[u8],
+        q_i8: &[i8],
+        group: usize,
+    ) -> i64 {
+        let amp_off = group * 5;
+        let phase_off = group * 6;
+        let q_base = group * 16;
+        let rem = self.num_pairs - group * 8; // 1..=7
+        let mut a_tail = [0u8; 8];
+        let mut p_tail = [0u8; 8];
+        let amp_avail = (amp_stream.len() - amp_off).min(8);
+        let phase_avail = (phase_stream.len() - phase_off).min(8);
+        a_tail[..amp_avail].copy_from_slice(&amp_stream[amp_off..amp_off + amp_avail]);
+        p_tail[..phase_avail].copy_from_slice(&phase_stream[phase_off..phase_off + phase_avail]);
+        let a_chunk = u64::from_le_bytes(a_tail);
+        let p_chunk = u64::from_le_bytes(p_tail);
+        let mut acc: i64 = 0;
+        for i in 0..rem {
+            let ai = ((a_chunk >> (i * 5)) & 0x1F) as usize;
+            let pi = ((p_chunk >> (i * 6)) & 0x3F) as usize;
+            let a = self.amp_table_i8[ai] as i32;
+            let c = self.cos_table_i8[pi] as i32;
+            let s = self.sin_table_i8[pi] as i32;
+            let qr = q_i8[q_base + i * 2] as i32;
+            let qi = q_i8[q_base + i * 2 + 1] as i32;
+            let ip16 = qr * c + qi * s;
+            let ip8 = ((ip16 + (1 << 6)) >> 7).clamp(-128, 127);
+            acc += (ip8 * a) as i64;
+        }
+        acc
     }
 
     #[cfg_attr(any(test, feature = "bench"), allow(dead_code))]
@@ -392,6 +466,26 @@ impl QamSlidingEngine {
             a_tail[..avail].copy_from_slice(&amp_stream[amp_off..amp_off + avail]);
             let a_chunk = u64::from_le_bytes(a_tail);
             for i in 0..8 {
+                let ai = ((a_chunk >> (i * 5)) & 0x1F) as usize;
+                let sigma = self.sigma_per_pair[g * 8 + i];
+                let amp_unit = self.amp_levels_unit[ai];
+                let v = sigma * amp_unit;
+                sum_sq += v * v;
+            }
+        }
+        // The `groups` loop above drops the trailing `num_pairs % 8` amp
+        // indices (and is a no-op when `num_pairs < 8`). Fold them in so
+        // `‖ŷ‖` accounts for every pair — otherwise the tail pairs would
+        // not contribute to the norm the rerank divides by.
+        if self.num_pairs % 8 != 0 {
+            let g = self.num_pairs / 8;
+            let amp_off = g * 5;
+            let avail = (amp_stream.len() - amp_off).min(8);
+            let mut a_tail = [0u8; 8];
+            a_tail[..avail].copy_from_slice(&amp_stream[amp_off..amp_off + avail]);
+            let a_chunk = u64::from_le_bytes(a_tail);
+            let rem = self.num_pairs - g * 8;
+            for i in 0..rem {
                 let ai = ((a_chunk >> (i * 5)) & 0x1F) as usize;
                 let sigma = self.sigma_per_pair[g * 8 + i];
                 let amp_unit = self.amp_levels_unit[ai];

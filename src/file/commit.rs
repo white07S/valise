@@ -181,7 +181,22 @@ impl ValiseFile {
         // unchanged on every commit; the digest in the header anchors
         // it as immutable.
         let footer = TocFooterCodec::encode_body(body)?;
-        let footer_offset = self.file.lock().metadata()?.len();
+        let footer_offset = {
+            let file_guard = self.file.lock();
+            let meta = file_guard.metadata()?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                if meta.nlink() == 0 {
+                    drop(file_guard); // MUST drop before coord_release_writer_lock (it re-locks self.file)
+                    self.coord_release_writer_lock();
+                    return Err(Error::Busy(
+                        "commit aborted: the file was replaced by a concurrent compaction (stale inode); reopen the Store".into(),
+                    ));
+                }
+            }
+            meta.len()
+        };
         write_toc_footer_at_end(&mut self.file.lock(), &footer)?;
         sync_file(&self.file.lock(), buffered)?; // no-op
         profile.footer_write = t.elapsed();
@@ -264,6 +279,7 @@ impl ValiseFile {
                     &registry.by_id,
                     mmap,
                     &self.codec_cache,
+                    None,
                 )?;
                 vb.ptrs = ptrs;
                 vb.stride = stride;
@@ -535,7 +551,13 @@ impl ValiseFile {
                 sketches_by_space,
                 upq_i8_by_space,
                 upq_dequant_by_space,
-            ) = build_vector_base_ptrs(&self.catalog, &registry.by_id, mmap, &self.codec_cache)?;
+            ) = build_vector_base_ptrs(
+                &self.catalog,
+                &registry.by_id,
+                mmap,
+                &self.codec_cache,
+                Some(&self.verified_payload_segments),
+            )?;
             guard.ptrs = ptrs;
             guard.stride = stride;
             guard.candidates_by_space = candidates_by_space;

@@ -332,6 +332,12 @@ impl ValiseFile {
             .as_ref()
             .ok_or_else(|| Error::Integrity("read_vector: file mmap is not initialized".into()))?;
         let payload = mmap_segment_payload(mmap_ref, segment_ref, SegmentType::VectorData)?;
+        verify_payload_wire_bytes(
+            segment_ref.segment_id,
+            &segment_ref.checksum,
+            payload,
+            &self.verified_payload_segments,
+        )?;
         let reader = VectorDataSegmentReader::open(payload, base_bytes)?;
         let stored_id = reader.vector_id(desc.ordinal_in_segment)?;
         if stored_id != vector_id {

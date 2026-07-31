@@ -1072,6 +1072,7 @@ pub(super) fn build_vector_base_ptrs(
     segment_by_id: &HashMap<SegmentId, SegmentRef>,
     file_mmap: &memmap2::Mmap,
     codec_cache: &HashMap<CodecId, Box<dyn VectorCodec>>,
+    verified: Option<&parking_lot::RwLock<std::collections::HashSet<crate::format::SegmentId>>>,
 ) -> Result<VectorBasePtrsResult> {
     // Structured open-time profiling (VALISE_QUERY_PROFILE or
     // VALISE_OPEN_PROFILE): total build, per-family cache build, and
@@ -1136,6 +1137,14 @@ pub(super) fn build_vector_base_ptrs(
             ))
         })?;
         let payload = mmap_segment_payload(file_mmap, seg_ref, SegmentType::VectorData)?;
+        if let Some(v) = verified {
+            crate::file::segment_io::verify_payload_wire_bytes(
+                seg_ref.segment_id,
+                &seg_ref.checksum,
+                payload,
+                v,
+            )?;
+        }
         // Look up the codec by traversing one descriptor → embedding
         // space → codec_id. v1 file scenario: one codec, but the lookup
         // is per-segment so multiple codecs would also work.
