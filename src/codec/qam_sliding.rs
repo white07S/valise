@@ -227,7 +227,7 @@ impl QamSlidingEngine {
         } else {
             0
         };
-        if self.num_pairs % 8 == 0 {
+        if self.num_pairs.is_multiple_of(8) {
             return full;
         }
         full + self.raw_dot_int_tail(amp_stream, phase_stream, &prep.q_i8, self.num_pairs / 8)
@@ -477,7 +477,7 @@ impl QamSlidingEngine {
         // indices (and is a no-op when `num_pairs < 8`). Fold them in so
         // `‖ŷ‖` accounts for every pair — otherwise the tail pairs would
         // not contribute to the norm the rerank divides by.
-        if self.num_pairs % 8 != 0 {
+        if !self.num_pairs.is_multiple_of(8) {
             let g = self.num_pairs / 8;
             let amp_off = g * 5;
             let avail = (amp_stream.len() - amp_off).min(8);

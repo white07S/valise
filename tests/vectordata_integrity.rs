@@ -136,9 +136,11 @@ fn corrupted_vectordata_base_is_detected_on_read() {
     // the segment happily — only the stored BLAKE3 catches it.
     let mut bytes = std::fs::read(&path).expect("read file");
     let (payload_start, payload_len) = find_vectordata_payload(&bytes);
-    let base_offset =
-        u32::from_le_bytes(bytes[payload_start + 26..payload_start + 30].try_into().unwrap())
-            as usize;
+    let base_offset = u32::from_le_bytes(
+        bytes[payload_start + 26..payload_start + 30]
+            .try_into()
+            .unwrap(),
+    ) as usize;
     let corrupt_at = payload_start + base_offset;
     assert!(
         corrupt_at + 8 <= payload_start + payload_len,

@@ -26,7 +26,8 @@ fn stale_inode_after_concurrent_compaction_is_loud_err_not_silent_ok() {
         s.collection("c", Schema::new().text("body")).unwrap();
         {
             let mut w = s.writer();
-            w.put("c", "k0", Record::new().text("body", "zero")).unwrap();
+            w.put("c", "k0", Record::new().text("body", "zero"))
+                .unwrap();
             w.commit().unwrap();
         }
         {
